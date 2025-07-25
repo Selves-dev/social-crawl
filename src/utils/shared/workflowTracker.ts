@@ -34,11 +34,12 @@ export interface WorkflowContext {
   
   // Metadata that accumulates through the workflow
   metadata: {
-    queries?: string[]          // Generated search queries (from control)
-    mediaInfo?: any            // Media metadata (from prep-media)
-    analysisResults?: any      // AI analysis results (from analyse-media)
-    enrichmentData?: any       // Final enriched data (from enrich-venue)
-    [key: string]: any         // Extensible for other data
+    inputQueries?: string[]        // User-provided queries at workflow start
+    generatedQueries?: string[]    // Generated search queries (from control stage)
+    mediaInfo?: any               // Media metadata (from prep-media)
+    analysisResults?: any         // AI analysis results (from analyse-media)
+    enrichmentData?: any          // Final enriched data (from enrich-venue)
+    [key: string]: any            // Extensible for other data
   }
   
   // Error tracking
@@ -65,7 +66,7 @@ export class WorkflowTracker {
       timestamp: new Date().toISOString(),
       completedStages: [],
       metadata: {
-        queries // Store queries in metadata for later use
+        inputQueries: queries // Store user-provided queries in metadata for later use
       }
     }
 
