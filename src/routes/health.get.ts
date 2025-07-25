@@ -1,11 +1,15 @@
 import { defineEventHandler, setHeaders } from 'h3'
 import { optionalAuth } from '../middleware/auth'
+import { db } from '../utils/shared/database'
 
 export default defineEventHandler(async (event) => {
   const startTime = Date.now()
   
   // Optional auth - logs warning but doesn't block health checks
   const isAuthenticated = await optionalAuth(event)
+  
+  // Check database health
+  const dbHealth = await db.healthCheck()
   
   // Basic health checks
   const health = {
@@ -15,6 +19,8 @@ export default defineEventHandler(async (event) => {
     checks: {
       server: 'ok',
       serviceBus: 'connected', // TODO: Check actual service bus connection status
+      database: dbHealth.status,
+      ...(dbHealth.latency && { databaseLatency: `${dbHealth.latency}ms` }),
       memory: {
         used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
         total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),

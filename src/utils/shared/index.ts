@@ -4,6 +4,7 @@
  */
 
 export * from './database'
+export * from './workflowDatabase'
 export * from './logger'
 export * from './serviceBus'
 export { QueueManager } from './queueManager'  // Only export QueueManager, not individual queues
