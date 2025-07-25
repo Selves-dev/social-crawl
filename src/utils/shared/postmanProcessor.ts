@@ -9,6 +9,7 @@ import { WorkflowTracker, WorkflowContext, WorkflowStage } from './workflowTrack
 import { QueueManager } from './queueManager'
 import { getSecurityManager } from './security'
 import { ServiceBusReceiver, ServiceBusReceivedMessage } from '@azure/service-bus'
+import { WorkflowDatabase } from './workflowDatabase'
 
 export interface PostmanMessage {
   type: 'workflow_progress' | 'new_batch' | 'item_found' | 'stage_complete' | 'error'
@@ -131,6 +132,10 @@ export class PostmanProcessor {
       locationId: context.locationId
     })
 
+    // Save initial workflow state to database
+    await WorkflowDatabase.saveWorkflow(context)
+    await WorkflowDatabase.saveLocation(context)
+
     // TODO: Trigger find-location processing
     // This would typically start the location search process
   }
@@ -143,6 +148,9 @@ export class PostmanProcessor {
       payload.itemUrl, 
       payload.itemType as any
     )
+
+    // Save updated workflow context with item information
+    await WorkflowDatabase.saveWorkflow(itemContext)
 
     // Ensure prep-media queue is running
     await QueueManager.startPrepMediaProcessing()
@@ -167,6 +175,14 @@ export class PostmanProcessor {
   private async handleStageComplete(context: WorkflowContext, payload: any): Promise<void> {
     const updatedContext = WorkflowTracker.completeStage(context, payload.results)
     
+    // Save updated workflow progress to database
+    await WorkflowDatabase.saveWorkflow(updatedContext)
+    
+    // If this stage involved processing a media item, save it
+    if (updatedContext.itemId) {
+      await WorkflowDatabase.saveMediaItem(updatedContext)
+    }
+    
     // Route to next stage based on current stage
     switch (context.stage) {
       case WorkflowStage.PREP_MEDIA:
@@ -179,7 +195,7 @@ export class PostmanProcessor {
         
       case WorkflowStage.ENRICH_VENUE:
         // Workflow complete for this item
-        this.logWorkflowComplete(updatedContext)
+        await this.logWorkflowComplete(updatedContext)
         break
         
       default:
@@ -229,6 +245,9 @@ export class PostmanProcessor {
   private async handleWorkflowProgress(context: WorkflowContext, payload: any): Promise<void> {
     const progress = WorkflowTracker.getProgress(context)
     
+    // Save workflow progress update to database
+    await WorkflowDatabase.saveWorkflow(context)
+    
     logger.info(`📊 Workflow progress update`, {
       service: 'postman-processor',
       ...progress
@@ -238,6 +257,9 @@ export class PostmanProcessor {
   private async handleError(context: WorkflowContext, payload: { error: string, stage?: string }): Promise<void> {
     const errorContext = WorkflowTracker.logError(context, payload.error)
     
+    // Save error state to database
+    await WorkflowDatabase.saveWorkflow(errorContext)
+    
     // TODO: Implement error handling strategy (retry, dead letter, etc.)
     logger.warn(`Error handling not yet implemented for: ${payload.error}`, {
       service: 'postman-processor',
@@ -245,8 +267,12 @@ export class PostmanProcessor {
     })
   }
 
-  private logWorkflowComplete(context: WorkflowContext): void {
+  private async logWorkflowComplete(context: WorkflowContext): Promise<void> {
     const progress = WorkflowTracker.getProgress(context)
+    
+    // Save final workflow state to database
+    await WorkflowDatabase.saveWorkflow(context)
+    await WorkflowDatabase.saveMediaItem(context)
     
     logger.info(`🎉 Item workflow complete: ${context.itemId}`, {
       service: 'postman-processor',
