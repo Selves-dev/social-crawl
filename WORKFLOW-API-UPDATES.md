@@ -1,0 +1,100 @@
+# Workflow API Updates
+
+## New Optional Parameters
+
+The workflow API now supports two additional optional parameters in the message payload:
+
+### 1. `countryCode` (cc)
+- **Type**: `string` (optional)
+- **Description**: Country code for the location being processed
+- **Example**: `"US"`, `"GB"`, `"CA"`
+
+### 2. `queries`
+- **Type**: `string[]` (optional) 
+- **Description**: Predefined search queries for the workflow
+- **Example**: `["restaurant reviews", "food photos", "dining experience"]`
+
+## API Usage Examples
+
+### Start Workflow Batch with Country Code and Queries
+
+```bash
+curl -X POST http://localhost:3000/workflow \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-token" \
+  -d '{
+    "action": "start_batch",
+    "locationId": "loc_123",
+    "locationName": "Downtown Restaurant District",
+    "countryCode": "US",
+    "queries": [
+      "restaurant reviews downtown",
+      "food photography",
+      "dining experience videos"
+    ]
+  }'
+```
+
+### Simulate Item Found with Country Code
+
+```bash
+curl -X POST http://localhost:3000/workflow \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-token" \
+  -d '{
+    "action": "simulate_item",
+    "locationId": "loc_123",
+    "locationName": "Downtown Restaurant District", 
+    "countryCode": "US",
+    "itemUrl": "https://example.com/video/123",
+    "itemType": "video"
+  }'
+```
+
+## Response Format
+
+The API responses now include the new fields:
+
+```json
+{
+  "status": "success",
+  "message": "Workflow batch started",
+  "batchId": "batch_loc_123_1722014347",
+  "locationId": "loc_123",
+  "locationName": "Downtown Restaurant District",
+  "countryCode": "US",
+  "queries": [
+    "restaurant reviews downtown",
+    "food photography", 
+    "dining experience videos"
+  ],
+  "timestamp": "2025-07-25T15:59:07.123Z"
+}
+```
+
+## Internal Message Structure
+
+The workflow context now includes:
+
+```typescript
+interface WorkflowContext {
+  batchId: string
+  locationId: string
+  locationName?: string
+  countryCode?: string    // NEW: Country code
+  stage: WorkflowStage
+  timestamp: string
+  // ... other fields
+  metadata: {
+    queries?: string[]    // NEW: Stored in metadata
+    // ... other metadata
+  }
+}
+```
+
+## Implementation Notes
+
+- Both `countryCode` and `queries` are optional and backwards compatible
+- Queries are stored in the `metadata.queries` field for use throughout the workflow
+- Country code is available at the top level of the context for easy access
+- All existing API functionality remains unchanged

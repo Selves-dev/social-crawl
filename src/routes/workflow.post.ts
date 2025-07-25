@@ -6,7 +6,7 @@ import { logger } from '../utils/shared'
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event)
-    const { locationId, locationName, action } = body
+    const { locationId, locationName, countryCode, queries, action } = body
 
     if (!locationId) {
       throw createError({
@@ -17,10 +17,10 @@ export default defineEventHandler(async (event) => {
 
     switch (action) {
       case 'start_batch':
-        return await startWorkflowBatch(locationId, locationName)
+        return await startWorkflowBatch(locationId, locationName, countryCode, queries)
       
       case 'simulate_item':
-        return await simulateItemFound(locationId, body.itemUrl, body.itemType)
+        return await simulateItemFound(locationId, body.itemUrl, body.itemType, locationName, countryCode)
       
       default:
         throw createError({
@@ -43,9 +43,9 @@ export default defineEventHandler(async (event) => {
   }
 })
 
-async function startWorkflowBatch(locationId: string, locationName?: string) {
+async function startWorkflowBatch(locationId: string, locationName?: string, countryCode?: string, queries?: string[]) {
   // Create new workflow context
-  const context = WorkflowTracker.createBatch(locationId, locationName)
+  const context = WorkflowTracker.createBatch(locationId, locationName, countryCode, queries)
   
   // Send message to postman
   const sender = serviceBus.createQueueSender()
@@ -53,7 +53,7 @@ async function startWorkflowBatch(locationId: string, locationName?: string) {
     body: {
       type: 'new_batch',
       context,
-      payload: { locationId, locationName }
+      payload: { locationId, locationName, countryCode, queries }
     },
     contentType: 'application/json',
     messageId: context.batchId
@@ -63,7 +63,8 @@ async function startWorkflowBatch(locationId: string, locationName?: string) {
   logger.info(`📬 Workflow batch message sent to postman`, {
     service: 'workflow-api',
     batchId: context.batchId,
-    locationId
+    locationId,
+    countryCode
   })
 
   return {
@@ -72,11 +73,13 @@ async function startWorkflowBatch(locationId: string, locationName?: string) {
     batchId: context.batchId,
     locationId,
     locationName,
+    countryCode,
+    queries,
     timestamp: new Date().toISOString()
   }
 }
 
-async function simulateItemFound(locationId: string, itemUrl: string, itemType: string) {
+async function simulateItemFound(locationId: string, itemUrl: string, itemType: string, locationName?: string, countryCode?: string) {
   if (!itemUrl || !itemType) {
     throw createError({
       statusCode: 400,
@@ -85,7 +88,7 @@ async function simulateItemFound(locationId: string, itemUrl: string, itemType: 
   }
 
   // Create a mock batch context (in real workflow, this would come from existing batch)
-  const context = WorkflowTracker.createBatch(locationId, `Simulated Location ${locationId}`)
+  const context = WorkflowTracker.createBatch(locationId, locationName, countryCode)
   const progressedContext = WorkflowTracker.progressToStage(context, WorkflowStage.CRAWL_MEDIA)
 
   // Send item found message to postman

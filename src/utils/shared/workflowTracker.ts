@@ -20,6 +20,7 @@ export interface WorkflowContext {
   batchId: string              // Parent batch ID for the location
   locationId: string           // The location being processed
   locationName?: string        // Human readable location name
+  countryCode?: string         // Country code (cc) for the location
   stage: WorkflowStage        // Current stage
   timestamp: string           // When this context was created/updated
   
@@ -52,24 +53,29 @@ export class WorkflowTracker {
   /**
    * Create a new workflow context for a location batch
    */
-  static createBatch(locationId: string, locationName?: string): WorkflowContext {
+  static createBatch(locationId: string, locationName?: string, countryCode?: string, queries?: string[]): WorkflowContext {
     const batchId = this.generateBatchId(locationId)
     
     const context: WorkflowContext = {
       batchId,
       locationId,
       locationName,
+      countryCode,
       stage: WorkflowStage.FIND_LOCATION,
       timestamp: new Date().toISOString(),
       completedStages: [],
-      metadata: {}
+      metadata: {
+        queries // Store queries in metadata for later use
+      }
     }
 
     logger.info(`🚀 Workflow batch created for location: ${locationName || locationId}`, {
       service: 'workflow-tracker',
       batchId,
       locationId,
-      stage: WorkflowStage.FIND_LOCATION
+      countryCode,
+      stage: WorkflowStage.FIND_LOCATION,
+      queryCount: queries?.length || 0
     })
 
     return context
