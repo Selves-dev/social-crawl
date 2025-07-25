@@ -1,0 +1,41 @@
+{
+  "name": "social-crawl",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "nitro build",
+    "dev": "nitro dev",
+    "preview": "nitro preview",
+    "start": "node dist/server/index.mjs",
+    "start:legacy": "node .output/server/index.mjs",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:local": "./scripts/build.sh local",
+    "build:prod": "./scripts/build.sh prod",
+    "deploy:check": "./scripts/deploy.sh prod check",
+    "deploy:setup": "./scripts/deploy.sh prod setup",
+    "deploy:prod": "./scripts/deploy.sh prod deploy",
+    "deploy:remove": "./scripts/deploy.sh prod remove",
+    "setup:secrets": "./scripts/setup-secrets.sh",
+    "setup:queues": "./scripts/setup-queues.sh",
+    "setup:local": "./scripts/setup-local.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "packageManager": "pnpm@8.15.6",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@azure/service-bus": "^7.9.5",
+    "dotenv": "^17.2.1",
+    "nitropack": "^2.12.4"
+  }
+}
