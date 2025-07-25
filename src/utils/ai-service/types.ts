@@ -1,6 +1,6 @@
 /**
  * AI Service Types
- * Simple types for Gemma 3 AI model deployment
+ * Simple types for Gemma 3n AI model deployment (latest efficient model)
  */
 
 export interface GemmaModelConfig {
@@ -10,8 +10,9 @@ export interface GemmaModelConfig {
     apiKey?: string      // Optional authentication
   }
   
-  // Basic model settings
+  // Gemma 3n model settings
   model: {
+    size: 'gemma-3n-E2B-it' | 'gemma-3n-E4B-it'  // E2B (effective 2B) or E4B (effective 4B)
     maxTokens: number
     temperature: number
   }
@@ -26,6 +27,9 @@ export interface AIAnalysisRequest {
   prompt: string
   maxTokens?: number
   temperature?: number
+  // Multimodal support (future)
+  imageUrl?: string
+  audioData?: string
 }
 
 export interface AIAnalysisResult {
