@@ -1,12 +1,36 @@
 /**
  * AI Service Types
- * Types for AI analysis operations
+ * Simple types for Gemma 3 AI model deployment
  */
 
+export interface GemmaModelConfig {
+  // Azure Container Instance configuration
+  azure: {
+    endpoint: string     // Container URL (e.g., http://gemma-social-crawl.eastus.azurecontainer.io:8080)
+    apiKey?: string      // Optional authentication
+  }
+  
+  // Basic model settings
+  model: {
+    maxTokens: number
+    temperature: number
+  }
+}
+
 export interface AIServiceConfig {
-  // TODO: Define AI service configuration
+  gemma: GemmaModelConfig
+  timeout: number // Request timeout in milliseconds
+}
+
+export interface AIAnalysisRequest {
+  prompt: string
+  maxTokens?: number
+  temperature?: number
 }
 
 export interface AIAnalysisResult {
-  // TODO: Define AI analysis result structure
+  success: boolean
+  text: string
+  processingTime: number
+  error?: string
 }
