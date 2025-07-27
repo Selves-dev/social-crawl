@@ -4,8 +4,11 @@
  */
 
 export * from './throttleQueue'
+// export * from './gemmaClient' // (Gemma support removed)
+export * from './types'
 
-// TODO: Add AI service functions
+// AI service utilities (Gemma integration removed)
 export const aiServiceUtils = {
-  // Placeholder for AI service methods
+  // Re-export for convenience
+  // createGemmaClient: () => import('./gemmaClient').then(m => m.createGemmaClientFromEnv())
 }
