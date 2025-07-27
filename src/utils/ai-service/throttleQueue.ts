@@ -1,21 +1,33 @@
-/**
- * AI Service Throttle Queue Utilities
- * Handles AI processing job throttling and processing
- */
 
+import { AIQueueMessage } from './types/aiQueueTypes'
+import { ensureAIServiceQueueRunning, shutdownAIServiceQueueIfIdle } from './handlers/queueLifecycle'
+import { v4 as uuidv4 } from 'uuid'
 import { serviceBus } from '../shared/serviceBus'
 import { logger } from '../shared/logger'
 import { getSecurityManager } from '../shared/security'
 import { ServiceBusReceiver, ServiceBusSender, ServiceBusReceivedMessage } from '@azure/service-bus'
+/**
+ * Enqueue a generic AI request (model-agnostic) into the throttle queue.
+ */
+export async function enqueueAIRequest(msg: AIQueueMessage): Promise<void> {
+  logger.info('enqueueAIRequest called', { prompt: msg.prompt, modelType: msg.modelType })
+  // Ensure the queue is running before enqueueing
+  await ensureAIServiceQueueRunning()
+  // Wrap the AIQueueMessage in a job envelope for the queue
+  const job = {
+    id: uuidv4(),
+    type: 'generic_ai' as const,
+    inputData: msg,
+    parameters: msg.options,
+    timestamp: new Date().toISOString()
+  }
+  await aiServiceQueue.sendJob(job)
+}
 
 export interface AIJob {
   id: string
-  type: 'analyze_media' | 'generate_caption' | 'classify_content'
-  inputData: {
-    mediaUrl?: string
-    text?: string
-    metadata?: Record<string, any>
-  }
+  type: 'analyze_media' | 'generate_caption' | 'classify_content' | 'generic_ai'
+  inputData: any
   parameters?: Record<string, any>
   timestamp: string
 }
@@ -33,6 +45,7 @@ export class AIServiceThrottleQueue {
   }
 
   async initialize(): Promise<void> {
+    logger.info('AIServiceThrottleQueue.initialize called', { queueName: this.queueName })
     if (!serviceBus.isConnected()) {
       throw new Error('Service bus not connected. Ensure postman plugin is loaded.')
     }
@@ -74,6 +87,7 @@ export class AIServiceThrottleQueue {
   }
 
   async startProcessing(): Promise<void> {
+    logger.info('startProcessing called', { isProcessing: this.isProcessing, receiver: !!this.receiver })
     if (!this.receiver || this.isProcessing) {
       return
     }
@@ -123,16 +137,54 @@ export class AIServiceThrottleQueue {
         jobType: job.type
       })
 
-      // TODO: Implement actual AI processing logic
-      const result = await this.processAITask(job)
+
+      // Model-agnostic handler dispatch
+      if (job.type === 'generic_ai') {
+        const msg = job.inputData as import('./types/aiQueueTypes').AIQueueMessage
+        // Import handlers from dedicated file
+        const { handleTextModel, handleTextImageModel, handleTextAudioModel } = await import('./handlers/handleModelRequest')
+        const modelHandlers: Record<string, (msg: import('./types/aiQueueTypes').AIQueueMessage) => Promise<any>> = {
+          text: handleTextModel,
+          text_image: handleTextImageModel,
+          text_audio: handleTextAudioModel
+        }
+        const handler = modelHandlers[msg.modelType]
+        if (!handler) throw new Error(`No handler for modelType: ${msg.modelType}`)
+        const result = await handler(msg)
+        // Pass result to Postman using msg.responseHandler
+        const { sendPostmanMessage } = await import('../shared/serviceBus')
+        await sendPostmanMessage({
+          type: 'ai_response',
+          context: msg.workflow,
+          payload: {
+            aiResponse: result,
+            responseHandler: msg.responseHandler
+          }
+        })
+        await this.receiver?.completeMessage(message)
+        logger.info(`AI job completed: ${job.id}`, {
+          service: 'ai-service',
+          jobId: job.id,
+          modelType: msg.modelType
+        })
+        // Auto-shutdown if queue is empty
+        if (this.receiver) {
+          const checkIsEmpty = async () => {
+            const peeked = await this.receiver!.peekMessages(1)
+            return peeked.length === 0
+          }
+          shutdownAIServiceQueueIfIdle(checkIsEmpty)
+        }
+        return
+      }
+      // ...existing code for other job types...
 
       // Complete the message on success
       await this.receiver?.completeMessage(message)
       
       logger.info(`AI job completed: ${job.id}`, {
         service: 'ai-service',
-        jobId: job.id,
-        resultKeys: Object.keys(result)
+        jobId: job.id
       })
 
     } catch (error) {

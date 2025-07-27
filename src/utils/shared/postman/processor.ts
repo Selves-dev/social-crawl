@@ -3,16 +3,17 @@
  * Handles main queue processing and workflow orchestration
  */
 
-import { serviceBus } from './serviceBus'
-import { logger } from './logger'
-import { WorkflowTracker, WorkflowContext, WorkflowStage } from './workflowTracker'
-import { QueueManager } from './queueManager'
-import { getSecurityManager } from './security'
+import { serviceBus } from '../serviceBus'
+import { logger } from '../logger'
+import { WorkflowTracker, WorkflowContext, WorkflowStage } from '../workflowTracker'
+import { QueueManager } from '../queueManager'
+import { getSecurityManager } from '../security'
 import { ServiceBusReceiver, ServiceBusReceivedMessage } from '@azure/service-bus'
-import { WorkflowDatabase } from './workflowDatabase'
+import { WorkflowDatabase } from '../workflowDatabase'
+import { postmanMappers } from './mappers'
 
 export interface PostmanMessage {
-  type: 'workflow_progress' | 'new_batch' | 'item_found' | 'stage_complete' | 'error'
+  type: 'workflow_progress' | 'new_batch' | 'item_found' | 'stage_complete' | 'error' | 'ai_request' | 'ai_response'
   context: WorkflowContext
   payload?: any
 }
@@ -84,32 +85,64 @@ export class PostmanProcessor {
         ...(context.itemId && { itemId: context.itemId })
       })
 
-      switch (type) {
-        case 'new_batch':
-          await this.handleNewBatch(context, payload)
-          break
-          
-        case 'item_found':
-          await this.handleItemFound(context, payload)
-          break
-          
-        case 'stage_complete':
-          await this.handleStageComplete(context, payload)
-          break
-          
-        case 'workflow_progress':
-          await this.handleWorkflowProgress(context, payload)
-          break
-          
-        case 'error':
-          await this.handleError(context, payload)
-          break
-          
-        default:
-          logger.warn(`Unknown postman message type: ${type}`, {
-            service: 'postman-processor',
-            messageType: type
-          })
+
+      // Use mappers for custom types, fallback to built-in handlers
+      if (postmanMappers[type]) {
+        await postmanMappers[type](payload, context)
+      } else {
+        switch (type) {
+          case 'ai_request': {
+            // Enqueue the AI job, passing the responseHandler
+            await QueueManager.startAIServiceProcessing()
+            await QueueManager.sendAIJob({
+              id: context.itemId || `ai_${Date.now()}`,
+              type: 'generic_ai',
+              inputData: {
+                modelType: payload.modelType,
+                prompt: payload.prompt,
+                workflow: context,
+                responseHandler: payload.responseHandler,
+                options: payload.options || {}
+              },
+              parameters: payload.options || {},
+              timestamp: new Date().toISOString()
+            })
+            break
+          }
+          case 'ai_response': {
+            // Call the handler specified in the message
+            const handlerType = payload?.responseHandler?.type
+            if (handlerType && postmanMappers[handlerType]) {
+              await postmanMappers[handlerType](payload.aiResponse, context)
+            } else {
+              logger.warn(`No handler found for ai_response type: ${handlerType}`, {
+                service: 'postman-processor',
+                messageType: type
+              })
+            }
+            break
+          }
+          case 'new_batch':
+            await this.handleNewBatch(context, payload)
+            break
+          case 'item_found':
+            await this.handleItemFound(context, payload)
+            break
+          case 'stage_complete':
+            await this.handleStageComplete(context, payload)
+            break
+          case 'workflow_progress':
+            await this.handleWorkflowProgress(context, payload)
+            break
+          case 'error':
+            await this.handleError(context, payload)
+            break
+          default:
+            logger.warn(`Unknown postman message type: ${type}`, {
+              service: 'postman-processor',
+              messageType: type
+            })
+        }
       }
 
       // Complete the message
@@ -188,16 +221,13 @@ export class PostmanProcessor {
       case WorkflowStage.PREP_MEDIA:
         await this.routeToAIService(updatedContext, payload.results)
         break
-        
       case WorkflowStage.ANALYSE_MEDIA:
         await this.routeToEnrichVenue(updatedContext, payload.results)
         break
-        
       case WorkflowStage.ENRICH_VENUE:
         // Workflow complete for this item
         await this.logWorkflowComplete(updatedContext)
         break
-        
       default:
         logger.info(`Stage ${context.stage} completed, no auto-routing`, {
           service: 'postman-processor',

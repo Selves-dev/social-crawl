@@ -1,7 +1,7 @@
 import { defineEventHandler, setHeaders } from 'h3'
 import { optionalAuth } from '../middleware/auth'
 import { db } from '../utils/shared/database'
-import { createGemmaClientFromEnv } from '../utils/ai-service'
+// ...existing code...
 
 export default defineEventHandler(async (event) => {
   const startTime = Date.now()
@@ -12,17 +12,7 @@ export default defineEventHandler(async (event) => {
   // Check database health
   const dbHealth = await db.healthCheck()
   
-  // Check Gemma AI health (if configured)
-  let gemmaHealth = 'not-configured'
-  const gemmaClient = createGemmaClientFromEnv()
-  if (gemmaClient) {
-    try {
-      const isHealthy = await gemmaClient.healthCheck()
-      gemmaHealth = isHealthy ? 'healthy' : 'unhealthy'
-    } catch (error) {
-      gemmaHealth = 'error'
-    }
-  }
+  // ...existing code...
   
   // Basic health checks
   const health = {
@@ -33,7 +23,7 @@ export default defineEventHandler(async (event) => {
       server: 'ok',
       serviceBus: 'connected', // TODO: Check actual service bus connection status
       database: dbHealth.status,
-      gemmaAI: gemmaHealth,
+      // ...existing code...
       ...(dbHealth.latency && { databaseLatency: `${dbHealth.latency}ms` }),
       memory: {
         used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),

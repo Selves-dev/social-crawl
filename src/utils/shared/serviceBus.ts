@@ -1,4 +1,22 @@
 /**
+ * Send a message to the main postman queue
+ */
+import { getSecurityManager } from './security'
+
+export async function sendPostmanMessage(message: any, queueName?: string): Promise<void> {
+  const sender = serviceBus.createQueueSender(queueName)
+  const security = getSecurityManager()
+  const applicationProperties = security.addMessageSecurity({
+    ...(message?.type && { type: message.type })
+  })
+  await sender.sendMessages({
+    body: message,
+    contentType: 'application/json',
+    messageId: message?.id || undefined,
+    applicationProperties
+  })
+}
+/**
  * Azure Service Bus Utilities (Basic Tier - Queue Only)
  * Handles Azure Service Bus connections and queue operations
  */

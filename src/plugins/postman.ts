@@ -1,6 +1,6 @@
 import { defineNitroPlugin } from 'nitropack/runtime'
-import { logger, serviceBus, getServiceBusConfigFromEnv, postmanProcessor, QueueManager } from '../utils/shared'
-
+import { logger, serviceBus, getServiceBusConfigFromEnv, QueueManager } from '../utils/shared'
+import { postmanProcessor } from '../utils/shared/postman/processor'
 export default defineNitroPlugin(async (nitroApp) => {
   logger.info('🚀 Starting postman plugin...', { service: 'postman' })
   
@@ -14,7 +14,6 @@ export default defineNitroPlugin(async (nitroApp) => {
     // Initialize throttle queues (but don't start processing yet)
     await QueueManager.initializeAllQueues()
     
-    // Initialize main postman processor
     await postmanProcessor.initialize()
     
     logger.info('✅ Postman and throttle queues initialized', { 

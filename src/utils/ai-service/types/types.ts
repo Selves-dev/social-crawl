@@ -1,34 +1,19 @@
 /**
  * AI Service Types
- * Simple types for Gemma 3n AI model deployment (latest efficient model)
+ * AI Service Types for text and multimodal models
  */
 
-export interface GemmaModelConfig {
-  // Azure Container Instance configuration
-  azure: {
-    endpoint: string     // Container URL (e.g., http://gemma-3n-e4b-uk.uksouth.azurecontainer.io:8080)
-    apiKey?: string      // Optional authentication
-  }
-  
-  // Gemma 3n model settings
-  model: {
-    size: 'google/gemma-3n-E2B' | 'google/gemma-3n-E4B' | 'unsloth/gemma-3n-E2B-bnb-4bit'  // HuggingFace Gemma 3n model names
-    maxTokens: number
-    temperature: number
-    functionCalling?: boolean  // Enable function calling capabilities
-  }
-}
+// ...Gemma model types removed...
 
-export interface AIServiceConfig {
-  gemma: GemmaModelConfig
+interface AIServiceConfig {
   timeout: number // Request timeout in milliseconds
 }
 
-export interface AIAnalysisRequest {
+interface AIAnalysisRequest {
   prompt: string
   maxTokens?: number
   temperature?: number
-  // Multimodal support for Gemma 3n
+  // Multimodal support
   imageUrl?: string        // URL to image or video (supports GCS: gs://bucket/path, HTTP URLs)
   imageData?: string       // Base64 encoded image data
   audioData?: string       // Base64 encoded audio data (6.25 tokens per second)
@@ -43,7 +28,7 @@ export interface AIAnalysisRequest {
   availableFunctions?: string[] // List of available functions ['web_search', 'scrape_url']
 }
 
-export interface AIAnalysisResult {
+interface AIAnalysisResult {
   success: boolean
   text: string
   processingTime: number
@@ -59,7 +44,7 @@ export interface AIAnalysisResult {
       title: string
       snippet: string
       url: string
-      content?: string      // Actual scraped content that was sent to Gemma
+      content?: string      // Actual scraped content sent to the model
     }>
     functionCalls?: Array<{  // Track function calls made
       name: string

@@ -9,7 +9,7 @@ export * from './logger'
 export * from './serviceBus'
 export { QueueManager } from './queueManager'  // Only export QueueManager, not individual queues
 export * from './workflowTracker'
-export * from './postmanProcessor'
+// (postmanProcessor has moved to ./postman/processor)
 export * from './security'
 
 // TODO: Add other shared utilities as needed
