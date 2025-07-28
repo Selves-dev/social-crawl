@@ -53,7 +53,7 @@ export async function handleTextModel(msg: AIQueueMessage): Promise<any> {
     temperature,
     max_tokens: msg.options?.maxTokens || 256
   }
-  logger.info('Calling Azure OpenAI', { url, body })
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -63,7 +63,7 @@ export async function handleTextModel(msg: AIQueueMessage): Promise<any> {
     body: JSON.stringify(body)
   })
   const data = await response.json()
-  logger.info('Azure OpenAI response', { data })
+
   const text = data.choices?.[0]?.message?.content || ''
   return {
     text,

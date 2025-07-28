@@ -30,7 +30,6 @@ import { logger } from '../shared/logger'
 export async function letterbox(message: any, context: any) {
   switch (message.type) {
     case 'ai_request': {
-      logger.info('[AI-Service] Received ai_request', { message, context, timestamp: new Date().toISOString() });
       // Pass message as-is; handleModelRequest will determine modelType
       const aiResult = await handleModelRequest(message, context);
       if (message.responseHandler && message.responseHandler.util && message.responseHandler.type) {

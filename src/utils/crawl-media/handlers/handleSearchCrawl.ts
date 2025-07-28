@@ -5,6 +5,18 @@
 import { crawlMediaQueue, CrawlMediaJob } from '../throttleQueue';
 
 export async function handleSearchCrawl(event: any) {
+  // Log received message and data
+  if (event) {
+    const { location, countryCode, query } = event;
+    const logger = (await import('../../shared/logger')).logger;
+    logger.info('[Crawl-Media] Received crawl-media request', {
+      location,
+      countryCode,
+      query,
+      event,
+      timestamp: new Date().toISOString()
+    });
+  }
   // 1. Get the search query from the event
   const { query } = event;
 

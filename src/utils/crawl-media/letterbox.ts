@@ -13,12 +13,17 @@ import { logger, QueueManager } from "../shared/index";
  */
 export async function letterbox(message: any, context: any) {
   switch (message.type) {
-    case 'media-crawl-request':
+    case 'media-crawl-request': {
       logger.info('[Crawl-Media] Received media-crawl-request', { message, context, timestamp: new Date().toISOString() });
       await QueueManager.startCrawlMediaProcessing();
       const result = await handleSearchCrawl(message);
-      await QueueManager.stopCrawlMediaProcessing();
+      // Only stop the queue if all jobs are finished
+      const { crawlMediaQueue } = await import('./throttleQueue');
+      if (crawlMediaQueue['queue'].length === 0 && crawlMediaQueue['activeWorkers'] === 0) {
+        await QueueManager.stopCrawlMediaProcessing();
+      }
       return result;
+    }
     default:
       logger.warn(`[Crawl-Media] Unknown message type: ${message.type}`, { message, context });
       return { error: 'Unknown message type', type: message.type };
