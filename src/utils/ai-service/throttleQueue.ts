@@ -1,6 +1,6 @@
 
-import { AIQueueMessage } from './types/aiQueueTypes'
-import { ensureAIServiceQueueRunning, shutdownAIServiceQueueIfIdle } from './handlers/queueLifecycle'
+import { AIQueueMessage } from './types/types'
+import { ensureAIServiceQueueRunning, shutdownAIServiceQueueIfIdle } from './letterbox'
 import { v4 as uuidv4 } from 'uuid'
 import { serviceBus } from '../shared/serviceBus'
 import { logger } from '../shared/logger'

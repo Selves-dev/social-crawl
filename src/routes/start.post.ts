@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody, sendError, createError } from 'h3'
-import { AIQueueMessage } from '../utils/ai-service/types/aiQueueTypes'
+import { AIQueueMessage } from '../utils/ai-service/types/types'
 import { WorkflowContext } from '../utils/shared/workflowTracker'
 import { sendPostmanMessage } from '../utils/shared/serviceBus'
 
@@ -16,11 +16,12 @@ export default defineEventHandler(async (event) => {
       return sendError(event, createError({ statusCode: 400, statusMessage: 'Missing response handler' }))
     }
 
-    // Send a postman message of type 'find-location' to the postman queue
+    // Send a postman message with util and type at the top level for generic routing
     await sendPostmanMessage({
-      type: 'find-location',
+      util: body.util || 'find-location',
       context: body.workflow as WorkflowContext,
       payload: {
+        type: body.type || 'find-location-request',
         responseHandler: body.responseHandler,
         options: body.options,
         meta: body.meta

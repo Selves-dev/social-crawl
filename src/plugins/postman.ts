@@ -18,7 +18,7 @@ export default defineNitroPlugin(async (nitroApp) => {
     
     logger.info('✅ Postman and throttle queues initialized', { 
       service: 'postman',
-      throttleQueues: ['prep-media', 'ai-service'],
+      throttleQueues: ['prep-media', 'ai-service', 'crawl-media'],
       mainQueue: 'post-office'
     })
     

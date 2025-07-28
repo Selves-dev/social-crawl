@@ -18,7 +18,8 @@
     "deploy:remove": "./scripts/deploy.sh prod remove",
     "setup:secrets": "./scripts/setup-secrets.sh",
     "setup:queues": "./scripts/setup-queues.sh",
-    "setup:local": "./scripts/setup-local.sh"
+    "setup:local": "./scripts/setup-local.sh",
+    "clean": "sh ./scripts/clean.sh"
   },
   "keywords": [],
   "author": "",
@@ -32,6 +33,7 @@
   "devDependencies": {
     "@types/mongodb": "^4.0.7",
     "@types/node": "^24.1.0",
+    "nitro": "^0.0.0",
     "typescript": "^5.8.3"
   },
   "dependencies": {

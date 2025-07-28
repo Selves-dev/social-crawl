@@ -5,17 +5,18 @@
 
 import { serviceBus } from '../serviceBus'
 import { logger } from '../logger'
-import { WorkflowTracker, WorkflowContext, WorkflowStage } from '../workflowTracker'
-import { QueueManager } from '../queueManager'
+import { WorkflowTracker, WorkflowContext, WorkflowStage } from '../workflow'
+import { QueueManager } from '../index'
 import { getSecurityManager } from '../security'
 import { ServiceBusReceiver, ServiceBusReceivedMessage } from '@azure/service-bus'
-import { WorkflowDatabase } from '../workflowDatabase'
+// import { WorkflowDatabase } from '../workflowDatabase' // Removed: file does not exist
 import { postmanMappers } from './mappers'
 
 export interface PostmanMessage {
-  type: 'workflow_progress' | 'new_batch' | 'item_found' | 'stage_complete' | 'error' | 'ai_request' | 'ai_response'
-  context: WorkflowContext
-  payload?: any
+  type: string;
+  util: string;
+  context: WorkflowContext;
+  payload?: any;
 }
 
 export class PostmanProcessor {
@@ -86,9 +87,11 @@ export class PostmanProcessor {
       })
 
 
-      // Use mappers for custom types, fallback to built-in handlers
-      if (postmanMappers[type]) {
-        await postmanMappers[type](payload, context)
+      // Always use util for mapper lookup, not type
+      const util = postmanMessage.util || payload?.util || type;
+      if (postmanMappers[util]) {
+        // Pass the full payload (including type) and context to the letterbox
+        await postmanMappers[util](payload, context)
       } else {
         switch (type) {
           case 'ai_request': {
@@ -209,12 +212,11 @@ export class PostmanProcessor {
     const updatedContext = WorkflowTracker.completeStage(context, payload.results)
     
     // Save updated workflow progress to database
-    await WorkflowDatabase.saveWorkflow(updatedContext)
-    
+    // await WorkflowDatabase.saveWorkflow(updatedContext)
     // If this stage involved processing a media item, save it
-    if (updatedContext.itemId) {
-      await WorkflowDatabase.saveMediaItem(updatedContext)
-    }
+    // if (updatedContext.itemId) {
+    //   await WorkflowDatabase.saveMediaItem(updatedContext)
+    // }
     
     // Route to next stage based on current stage
     switch (context.stage) {
@@ -276,7 +278,7 @@ export class PostmanProcessor {
     const progress = WorkflowTracker.getProgress(context)
     
     // Save workflow progress update to database
-    await WorkflowDatabase.saveWorkflow(context)
+    // await WorkflowDatabase.saveWorkflow(context)
     
     logger.info(`📊 Workflow progress update`, {
       service: 'postman-processor',
@@ -288,7 +290,7 @@ export class PostmanProcessor {
     const errorContext = WorkflowTracker.logError(context, payload.error)
     
     // Save error state to database
-    await WorkflowDatabase.saveWorkflow(errorContext)
+    // await WorkflowDatabase.saveWorkflow(errorContext)
     
     // TODO: Implement error handling strategy (retry, dead letter, etc.)
     logger.warn(`Error handling not yet implemented for: ${payload.error}`, {
@@ -301,8 +303,8 @@ export class PostmanProcessor {
     const progress = WorkflowTracker.getProgress(context)
     
     // Save final workflow state to database
-    await WorkflowDatabase.saveWorkflow(context)
-    await WorkflowDatabase.saveMediaItem(context)
+    // await WorkflowDatabase.saveWorkflow(context)
+    // await WorkflowDatabase.saveMediaItem(context)
     
     logger.info(`🎉 Item workflow complete: ${context.itemId}`, {
       service: 'postman-processor',

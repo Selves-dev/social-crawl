@@ -1,6 +1,31 @@
+/**
+ * Main entry point for AI model requests. Dispatches to the correct handler based on modelType.
+ */
+// ...existing code...
+import type { WorkflowContext } from '../../shared/workflowTracker'
+
+export async function handleModelRequest(message: AIQueueMessage, context?: WorkflowContext): Promise<any> {
+  // Dynamically determine modelType if not provided
+  let modelType = message.modelType;
+  if (!modelType) {
+    // TODO: Add logic for multimodal detection (images/audio) in future
+    modelType = 'text';
+  }
+  const aiMessage = { ...message, modelType };
+  switch (aiMessage.modelType) {
+    case 'text':
+      return handleTextModel(aiMessage)
+    case 'text_image':
+      return handleTextImageModel(aiMessage)
+    case 'text_audio':
+      return handleTextAudioModel(aiMessage)
+    default:
+      throw new Error(`Unknown modelType: ${aiMessage.modelType}`)
+  }
+}
 import { logger } from '../../shared/logger'
 import fetch from 'node-fetch'
-import type { AIQueueMessage } from '../types/aiQueueTypes'
+import type { AIQueueMessage } from '../types/types'
 
 /**
  * Handler for text-only model requests (Azure GPT)

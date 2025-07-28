@@ -4,12 +4,12 @@
  */
 
 export * from './database'
-export * from './workflowDatabase'
+// export * from './workflowDatabase' // Removed: file does not exist
 export * from './logger'
 export * from './serviceBus'
 export { QueueManager } from './queueManager'  // Only export QueueManager, not individual queues
-export * from './workflowTracker'
-// (postmanProcessor has moved to ./postman/processor)
+// export * from './workflowTracker' // Removed: file does not exist
+export * from './postman/processor'
 export * from './security'
 
 // TODO: Add other shared utilities as needed

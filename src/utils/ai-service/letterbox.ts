@@ -1,4 +1,4 @@
-import { QueueManager } from '../shared/queueManager'
+import { QueueManager } from '../index'
 /**
  * Ensures the AI service queue is started before enqueueing a request.
  */

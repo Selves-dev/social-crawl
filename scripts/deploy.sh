@@ -16,9 +16,9 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENVIRONMENT=${1:-prod}
 ACTION=${2:-deploy}  # deploy, check, setup, remove
-RESOURCE_GROUP="social-crawl-rg"
+RESOURCE_GROUP="social-crawl-res"
 APP_NAME="social-crawl"
-LOCATION="eastus"
+LOCATION="uksouth"
 KEY_VAULT_NAME="social-crawl-kv"
 CONTAINER_REGISTRY="socialcrawlacr"
 BUILD_DIR="builds/$ENVIRONMENT"
@@ -121,12 +121,38 @@ check_environment() {
 # Setup Azure resources
 setup_azure_resources() {
     echo -e "${BLUE}🏗️ Setting up Azure resources...${NC}"
-    
+
+    # Register required Azure providers
+    echo -e "${BLUE}� Registering required Azure resource providers...${NC}"
+    az provider register --namespace Microsoft.KeyVault
+    az provider register --namespace Microsoft.ServiceBus
+    az provider register --namespace Microsoft.ContainerRegistry
+    az provider register --namespace Microsoft.App
+    az provider register --namespace Microsoft.OperationalInsights
+    az provider register --namespace Microsoft.Insights
+    az provider register --namespace Microsoft.ManagedIdentity
+    az provider register --namespace Microsoft.Network
+    az provider register --namespace Microsoft.Web
+    az provider register --namespace Microsoft.Resources
+
+    # Wait for registration
+    echo -e "${BLUE}⏳ Waiting for provider registration...${NC}"
+    az provider show --namespace Microsoft.KeyVault --query registrationState -o tsv | grep -q Registered || sleep 5
+    az provider show --namespace Microsoft.ServiceBus --query registrationState -o tsv | grep -q Registered || sleep 5
+    az provider show --namespace Microsoft.ContainerRegistry --query registrationState -o tsv | grep -q Registered || sleep 5
+    az provider show --namespace Microsoft.App --query registrationState -o tsv | grep -q Registered || sleep 5
+    az provider show --namespace Microsoft.OperationalInsights --query registrationState -o tsv | grep -q Registered || sleep 5
+    az provider show --namespace Microsoft.Insights --query registrationState -o tsv | grep -q Registered || sleep 5
+    az provider show --namespace Microsoft.ManagedIdentity --query registrationState -o tsv | grep -q Registered || sleep 5
+    az provider show --namespace Microsoft.Network --query registrationState -o tsv | grep -q Registered || sleep 5
+    az provider show --namespace Microsoft.Web --query registrationState -o tsv | grep -q Registered || sleep 5
+    az provider show --namespace Microsoft.Resources --query registrationState -o tsv | grep -q Registered || sleep 5
+
     # Create resource group
     echo -e "${BLUE}📁 Creating resource group...${NC}"
     az group create --name "$RESOURCE_GROUP" --location "$LOCATION"
-    
-    # Create Key Vault (if it doesn't exist)
+
+    # Create Key Vault if it doesn't exist
     echo -e "${BLUE}🔐 Setting up Key Vault...${NC}"
     if az keyvault show --name "$KEY_VAULT_NAME" &> /dev/null; then
         echo -e "${GREEN}✅ Key Vault '$KEY_VAULT_NAME' already exists${NC}"
@@ -139,8 +165,23 @@ setup_azure_resources() {
             --sku standard
         echo -e "${GREEN}✅ Key Vault '$KEY_VAULT_NAME' created${NC}"
     fi
-    
-    # Create Service Bus Namespace (if it doesn't exist)
+
+    # Create Container Registry if it doesn't exist
+    echo -e "${BLUE}🐳 Setting up Container Registry...${NC}"
+    if az acr show --name "$CONTAINER_REGISTRY" &> /dev/null; then
+        echo -e "${GREEN}✅ Container Registry '$CONTAINER_REGISTRY' already exists${NC}"
+    else
+        echo -e "${BLUE}🐳 Creating Container Registry...${NC}"
+        az acr create \
+            --name "$CONTAINER_REGISTRY" \
+            --resource-group "$RESOURCE_GROUP" \
+            --location "$LOCATION" \
+            --sku Basic \
+            --admin-enabled true
+        echo -e "${GREEN}✅ Container Registry '$CONTAINER_REGISTRY' created${NC}"
+    fi
+
+    # Create Service Bus Namespace if it doesn't exist
     echo -e "${BLUE}📨 Setting up Service Bus Namespace...${NC}"
     if az servicebus namespace show --name "social-crawl-sb" --resource-group "$RESOURCE_GROUP" &> /dev/null; then
         echo -e "${GREEN}✅ Service Bus Namespace 'social-crawl-sb' already exists${NC}"
@@ -153,11 +194,9 @@ setup_azure_resources() {
             --sku Basic
         echo -e "${GREEN}✅ Service Bus Namespace 'social-crawl-sb' created${NC}"
     fi
-    
-    # Create Service Bus Queues (if they don't exist)
+
+    # Create Service Bus Queues if they don't exist
     echo -e "${BLUE}📬 Setting up Service Bus Queues...${NC}"
-    
-    # Function to create queue if it doesn't exist
     create_queue_if_not_exists() {
         local queue_name="$1"
         if az servicebus queue show --namespace-name "social-crawl-sb" --resource-group "$RESOURCE_GROUP" --name "$queue_name" &> /dev/null; then
@@ -173,65 +212,9 @@ setup_azure_resources() {
             echo -e "${GREEN}✅ Queue '$queue_name' created${NC}"
         fi
     }
-    
-    # Create queues
     create_queue_if_not_exists "post-office"
     create_queue_if_not_exists "prep-media"
     create_queue_if_not_exists "ai-service"
-    
-    # Create Container Registry (if it doesn't exist)
-    echo -e "${BLUE}🐳 Setting up Container Registry...${NC}"
-    if az acr show --name "$CONTAINER_REGISTRY" &> /dev/null; then
-        echo -e "${GREEN}✅ Container Registry '$CONTAINER_REGISTRY' already exists${NC}"
-    else
-        echo -e "${BLUE}🐳 Creating Container Registry...${NC}"
-        az acr create \
-            --name "$CONTAINER_REGISTRY" \
-            --resource-group "$RESOURCE_GROUP" \
-            --location "$LOCATION" \
-            --sku Basic \
-            --admin-enabled true
-        echo -e "${GREEN}✅ Container Registry '$CONTAINER_REGISTRY' created${NC}"
-    fi
-    
-    # Create App Service Plan (if it doesn't exist)
-    echo -e "${BLUE}🏭 Setting up App Service Plan...${NC}"
-    if az appservice plan show --name "${APP_NAME}-plan" --resource-group "$RESOURCE_GROUP" &> /dev/null; then
-        echo -e "${GREEN}✅ App Service Plan '${APP_NAME}-plan' already exists${NC}"
-    else
-        echo -e "${BLUE}🏭 Creating App Service Plan...${NC}"
-        az appservice plan create \
-            --name "${APP_NAME}-plan" \
-            --resource-group "$RESOURCE_GROUP" \
-            --location "$LOCATION" \
-            --is-linux \
-            --sku B1
-        echo -e "${GREEN}✅ App Service Plan '${APP_NAME}-plan' created${NC}"
-    fi
-    
-    # Create Web App (if it doesn't exist)
-    echo -e "${BLUE}🌐 Setting up Web App...${NC}"
-    if az webapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" &> /dev/null; then
-        echo -e "${GREEN}✅ Web App '$APP_NAME' already exists${NC}"
-    else
-        echo -e "${BLUE}🌐 Creating Web App...${NC}"
-        az webapp create \
-            --name "$APP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --plan "${APP_NAME}-plan" \
-            --deployment-container-image-name "${CONTAINER_REGISTRY}.azurecr.io/${APP_NAME}:latest"
-        echo -e "${GREEN}✅ Web App '$APP_NAME' created${NC}"
-    fi
-    
-    # Setup Service Bus queues
-    echo -e "${BLUE}📬 Setting up Service Bus queues...${NC}"
-    if "$SCRIPT_DIR/setup-queues.sh" "$ENVIRONMENT"; then
-        echo -e "${GREEN}✅ Service Bus queues setup completed${NC}"
-    else
-        echo -e "${YELLOW}⚠️ Service Bus queue setup failed, but continuing...${NC}"
-    fi
-    
-    echo -e "${GREEN}✅ Azure resources setup completed${NC}"
 }
 
 # Remove Azure resources

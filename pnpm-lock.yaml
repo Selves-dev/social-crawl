@@ -25,6 +25,9 @@ devDependencies:
   '@types/node':
     specifier: ^24.1.0
     version: 24.1.0
+  nitro:
+    specifier: ^0.0.0
+    version: 0.0.0
   typescript:
     specifier: ^5.8.3
     version: 5.8.3
@@ -3415,6 +3418,10 @@ packages:
       p-wait-for: 5.0.2
       qs: 6.14.0
     dev: false
+
+  /nitro@0.0.0:
+    resolution: {integrity: sha512-01S4adMoYsgKIh5u7Y+sJO8u7hSxRi9ToDBeLTYZJ+L8thyjlCkDrOIWbG+y0SJRE8DpADQYGvJWPebBdJ/xvg==}
+    dev: true
 
   /nitropack@2.12.4:
     resolution: {integrity: sha512-MPmPRJWTeH03f/NmpN4q3iI3Woik4uaaWIoX34W3gMJiW06Vm1te/lPzuu5EXpXOK7Q2m3FymGMPXcExqih96Q==}
