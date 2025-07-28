@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1
 ENV MODEL_NAME=google/gemma-3n-E2B
 ENV MAX_TOKENS=150
 ENV TEMPERATURE=0.7
-ENV PORT=8080
+ENV PORT=3000
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -30,11 +30,11 @@ RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Expose port
-EXPOSE 8080
+EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:3000/health || exit 1
 
 # Run the application
 CMD ["python", "server.py"]

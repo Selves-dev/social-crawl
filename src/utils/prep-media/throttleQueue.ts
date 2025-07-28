@@ -24,8 +24,8 @@ export class PrepMediaThrottleQueue {
   private readonly maxConcurrentJobs: number
 
   constructor() {
-    this.queueName = process.env.AZURE_SERVICE_BUS_PREP_MEDIA_QUEUE || 'prep-media'
-    this.maxConcurrentJobs = parseInt(process.env.PREP_MEDIA_MAX_CONCURRENT_JOBS || '3', 10)
+    this.queueName = process.env["ASB-PREP-MEDIA-QUEUE"] || 'prep-media'
+    this.maxConcurrentJobs = parseInt(process.env["PREP-MEDIA-MAX-CONCURRENT-JOBS"] || '3', 10)
   }
 
   async initialize(): Promise<void> {

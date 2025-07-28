@@ -40,8 +40,8 @@ export class AIServiceThrottleQueue {
   private readonly maxConcurrentJobs: number
 
   constructor() {
-    this.queueName = process.env.AZURE_SERVICE_BUS_AI_SERVICE_QUEUE || 'ai-service'
-    this.maxConcurrentJobs = parseInt(process.env.AI_SERVICE_MAX_CONCURRENT_JOBS || '2', 10)
+    this.queueName = process.env["ASB-AI-SERVICE-QUEUE"] || 'ai-service'
+    this.maxConcurrentJobs = parseInt(process.env["AI-SERVICE-MAX-CONCURRENT-JOBS"] || '2', 10)
   }
 
   async initialize(): Promise<void> {

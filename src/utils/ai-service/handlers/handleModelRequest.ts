@@ -2,7 +2,7 @@
  * Main entry point for AI model requests. Dispatches to the correct handler based on modelType.
  */
 // ...existing code...
-import type { WorkflowContext } from '../../shared/workflowTracker'
+import type { WorkflowContext } from '../../shared/workflow'
 
 export async function handleModelRequest(message: AIQueueMessage, context?: WorkflowContext): Promise<any> {
   // Dynamically determine modelType if not provided
@@ -35,11 +35,11 @@ export async function handleTextModel(msg: AIQueueMessage): Promise<any> {
   logger.info('handleTextModel called', { prompt: msg.prompt })
 
   // Gather Azure OpenAI config from env
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.replace(/\/$/, '')
-  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT
-  const apiKey = process.env.AZURE_OPENAI_API_KEY
-  const apiVersion = process.env.AZURE_OPENAI_API_VERSION
-  const temperature = parseFloat(process.env.AZURE_OPENAI_TEMPERATURE || '0.25')
+  const endpoint = process.env["AZURE-OPENAI-ENDPOINT"]?.replace(/\/$/, '')
+  const deployment = process.env["AZURE-OPENAI-DEPLOYMENT"]
+  const apiKey = process.env["AZURE-OPENAI-API-KEY"]
+  const apiVersion = process.env["AZURE-OPENAI-API-VERSION"]
+  const temperature = parseFloat(process.env["AZURE-OPENAI-TEMPERATURE"] || '0.25')
   if (!endpoint || !deployment || !apiKey || !apiVersion) {
     logger.error('Missing Azure OpenAI config: ' + JSON.stringify({ endpoint, deployment, apiKey: !!apiKey, apiVersion }))
     throw new Error('Azure OpenAI config missing')

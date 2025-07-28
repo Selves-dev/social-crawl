@@ -75,7 +75,6 @@ echo -e "${BLUE}📁 Copying deployment files...${NC}"
 cp package.json "$BUILD_DIR/"
 cp pnpm-lock.yaml "$BUILD_DIR/" 2>/dev/null || cp package-lock.json "$BUILD_DIR/" 2>/dev/null || echo -e "${YELLOW}⚠️ No lock file found${NC}"
 cp README.md "$BUILD_DIR/"
-cp DEPLOYMENT.md "$BUILD_DIR/"
 
 # Create environment-specific files
 if [[ "$ENVIRONMENT" == "local" ]]; then

@@ -102,25 +102,25 @@ export const serviceBus = new ServiceBusManager()
 
 // Helper function to get config from environment variables
 export function getServiceBusConfigFromEnv(): ServiceBusConfig {
-  const connectionString = process.env.AZURE_SERVICE_BUS_CONNECTION_STRING
-  const queueName = process.env.AZURE_SERVICE_BUS_QUEUE_NAME
+  const connectionString = process.env["AZURE-SERVICE-BUS-CONNECTION-STRING"]
+  const queueName = process.env["ASB-POST-OFFICE-QUEUE"]
   
   if (!connectionString) {
-    throw new Error('AZURE_SERVICE_BUS_CONNECTION_STRING environment variable is required')
+    throw new Error('AZURE-SERVICE-BUS-CONNECTION-STRING environment variable is required')
   }
   
   if (!queueName) {
-    throw new Error('AZURE_SERVICE_BUS_QUEUE_NAME environment variable is required')
+    throw new Error('ASB-POST-OFFICE-QUEUE environment variable is required')
   }
 
   return {
     connectionString,
     queueName,
-    maxConcurrentCalls: process.env.AZURE_SERVICE_BUS_MAX_CONCURRENT_CALLS 
-      ? parseInt(process.env.AZURE_SERVICE_BUS_MAX_CONCURRENT_CALLS, 10) 
+    maxConcurrentCalls: process.env["ASB-MAX-CONCURRENT-CALLS"] 
+      ? parseInt(process.env["ASB-MAX-CONCURRENT-CALLS"], 10) 
       : 10,
-    maxAutoRenewDurationMinutes: process.env.AZURE_SERVICE_BUS_MAX_AUTO_RENEW_DURATION_MINUTES
-      ? parseInt(process.env.AZURE_SERVICE_BUS_MAX_AUTO_RENEW_DURATION_MINUTES, 10)
+    maxAutoRenewDurationMinutes: process.env["ASB-MAX-AUTO-RENEW-DURATION-MINUTES"]
+      ? parseInt(process.env["ASB-MAX-AUTO-RENEW-DURATION-MINUTES"], 10)
       : 5
   }
 }

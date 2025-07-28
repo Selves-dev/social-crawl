@@ -11,7 +11,8 @@ export default defineNitroPlugin(async (nitroApp) => {
   logger.info('🚀 Starting database plugin...', { service: 'database' })
   
   try {
-    await db.connect()
+    const uri = process.env["MONGODB-URI"]
+    await db.connect(uri)
     logger.info('✅ Database plugin initialized successfully', { service: 'database' })
   } catch (error) {
     logger.error('❌ Failed to initialize database plugin', error as Error, { service: 'database' })
