@@ -1,8 +1,9 @@
 /**
- * Workflow Tracking Utilities
- * Handles progress tracking through the social crawl workflow stages
+ * Workflow Tracking and Database Utilities
+ * Combines workflow context management and MongoDB persistence for the social crawl workflow
  */
 
+import { db } from '../shared/database'
 import { logger } from '../shared/logger'
 
 // Workflow stages enum
@@ -23,16 +24,10 @@ export interface WorkflowContext {
   countryCode?: string         // Country code (cc) for the location
   stage: WorkflowStage        // Current stage
   timestamp: string           // When this context was created/updated
-  
-  // Item-specific tracking (set after crawl-media stage)
   itemId?: string             // Individual video/media item ID
   itemUrl?: string            // Source URL of the media
   itemType?: 'video' | 'image' | 'post'
-  
-  // Stage completion tracking
   completedStages: WorkflowStage[]
-  
-  // Metadata that accumulates through the workflow
   metadata: {
     inputQueries?: string[]        // User-provided queries at workflow start
     generatedQueries?: string[]    // Generated search queries (from control stage)
@@ -41,8 +36,6 @@ export interface WorkflowContext {
     enrichmentData?: any          // Final enriched data (from enrich-venue)
     [key: string]: any            // Extensible for other data
   }
-  
-  // Error tracking
   errors?: Array<{
     stage: WorkflowStage
     error: string
@@ -50,13 +43,55 @@ export interface WorkflowContext {
   }>
 }
 
+// Document interfaces for DB
+export interface LocationDocument {
+  _id?: string
+  locationId: string
+  locationName?: string
+  countryCode?: string
+  createdAt: Date
+  updatedAt: Date
+  metadata: {
+    queries?: string[]
+    coordinates?: {
+      lat: number
+      lng: number
+    }
+  }
+}
+
+export interface MediaDocument {
+  _id?: string
+  itemId: string
+  itemUrl: string
+  itemType: 'video' | 'image' | 'post'
+  locationId: string
+  batchId: string
+  processedAt?: Date
+  metadata: {
+    duration?: number
+    size?: number
+    analysisResults?: any
+  }
+}
+
+export interface WorkflowDocument {
+  _id?: string
+  batchId: string
+  locationId: string
+  status: 'active' | 'completed' | 'failed'
+  currentStage: string
+  createdAt: Date
+  updatedAt: Date
+  context: WorkflowContext
+}
+
+/**
+ * Workflow context management utilities
+ */
 export class WorkflowTracker {
-  /**
-   * Create a new workflow context for a location batch
-   */
   static createBatch(locationId: string, locationName?: string, countryCode?: string, queries?: string[]): WorkflowContext {
     const batchId = this.generateBatchId(locationId)
-    
     const context: WorkflowContext = {
       batchId,
       locationId,
@@ -66,10 +101,9 @@ export class WorkflowTracker {
       timestamp: new Date().toISOString(),
       completedStages: [],
       metadata: {
-        inputQueries: queries // Store user-provided queries in metadata for later use
+        inputQueries: queries
       }
     }
-
     logger.info(`🚀 Workflow batch created for location: ${locationName || locationId}`, {
       service: 'workflow-tracker',
       batchId,
@@ -78,19 +112,10 @@ export class WorkflowTracker {
       stage: WorkflowStage.FIND_LOCATION,
       queryCount: queries?.length || 0
     })
-
     return context
   }
 
-  /**
-   * Create context for an individual item (after crawl-media stage)
-   */
-  static createItemContext(
-    batchContext: WorkflowContext, 
-    itemId: string, 
-    itemUrl: string, 
-    itemType: 'video' | 'image' | 'post'
-  ): WorkflowContext {
+  static createItemContext(batchContext: WorkflowContext, itemId: string, itemUrl: string, itemType: 'video' | 'image' | 'post'): WorkflowContext {
     const itemContext: WorkflowContext = {
       ...batchContext,
       itemId,
@@ -101,33 +126,27 @@ export class WorkflowTracker {
       completedStages: [...batchContext.completedStages, WorkflowStage.CRAWL_MEDIA],
       metadata: { ...batchContext.metadata }
     }
-
     logger.info(`📱 Item context created: ${itemType} ${itemId}`, {
       service: 'workflow-tracker',
       batchId: batchContext.batchId,
       itemId,
-      itemUrl: itemUrl.substring(0, 100), // Truncate URL for logging
+      itemUrl: itemUrl.substring(0, 100),
       itemType,
       stage: WorkflowStage.PREP_MEDIA
     })
-
     return itemContext
   }
 
-  /**
-   * Progress context to next stage
-   */
   static progressToStage(context: WorkflowContext, stage: WorkflowStage, metadata?: any): WorkflowContext {
     const updatedContext: WorkflowContext = {
       ...context,
       stage,
       timestamp: new Date().toISOString(),
-      completedStages: context.completedStages.includes(context.stage) 
-        ? context.completedStages 
+      completedStages: context.completedStages.includes(context.stage)
+        ? context.completedStages
         : [...context.completedStages, context.stage],
       metadata: metadata ? { ...context.metadata, ...metadata } : context.metadata
     }
-
     const logContext = {
       service: 'workflow-tracker',
       batchId: context.batchId,
@@ -136,25 +155,19 @@ export class WorkflowTracker {
       completedStages: updatedContext.completedStages.length,
       totalStages: Object.keys(WorkflowStage).length
     }
-
     logger.info(`➡️ Workflow progressed to ${stage}`, logContext)
-
     return updatedContext
   }
 
-  /**
-   * Mark stage as completed with results
-   */
   static completeStage(context: WorkflowContext, results?: any): WorkflowContext {
     const updatedContext: WorkflowContext = {
       ...context,
       timestamp: new Date().toISOString(),
-      completedStages: context.completedStages.includes(context.stage) 
-        ? context.completedStages 
+      completedStages: context.completedStages.includes(context.stage)
+        ? context.completedStages
         : [...context.completedStages, context.stage],
       metadata: results ? { ...context.metadata, ...results } : context.metadata
     }
-
     const logContext = {
       service: 'workflow-tracker',
       batchId: context.batchId,
@@ -163,10 +176,7 @@ export class WorkflowTracker {
       completedStages: updatedContext.completedStages.length,
       totalStages: Object.keys(WorkflowStage).length
     }
-
     logger.info(`✅ Stage completed: ${context.stage}`, logContext)
-
-    // Check if workflow is complete
     if (updatedContext.completedStages.length === Object.keys(WorkflowStage).length) {
       logger.info(`🎉 Workflow complete for ${context.itemId ? 'item' : 'batch'}`, {
         service: 'workflow-tracker',
@@ -175,16 +185,11 @@ export class WorkflowTracker {
         duration: this.calculateDuration(context.batchId)
       })
     }
-
     return updatedContext
   }
 
-  /**
-   * Log error in workflow stage
-   */
   static logError(context: WorkflowContext, error: Error | string): WorkflowContext {
     const errorMsg = error instanceof Error ? error.message : error
-    
     const updatedContext: WorkflowContext = {
       ...context,
       timestamp: new Date().toISOString(),
@@ -197,20 +202,15 @@ export class WorkflowTracker {
         }
       ]
     }
-
     logger.error(`❌ Workflow error in ${context.stage}`, error instanceof Error ? error : new Error(errorMsg), {
       service: 'workflow-tracker',
       batchId: context.batchId,
       stage: context.stage,
       ...(context.itemId && { itemId: context.itemId })
     })
-
     return updatedContext
   }
 
-  /**
-   * Get workflow progress summary
-   */
   static getProgress(context: WorkflowContext): {
     batchId: string
     itemId?: string
@@ -223,7 +223,6 @@ export class WorkflowTracker {
   } {
     const totalStages = Object.keys(WorkflowStage).length
     const completedCount = context.completedStages.length
-    
     return {
       batchId: context.batchId,
       itemId: context.itemId,
@@ -243,7 +242,6 @@ export class WorkflowTracker {
   }
 
   private static calculateDuration(batchId: string): string {
-    // Extract timestamp from batch ID for duration calculation
     const parts = batchId.split('_')
     if (parts.length >= 3) {
       const startTime = parseInt(parts[2])
@@ -254,5 +252,143 @@ export class WorkflowTracker {
   }
 }
 
-// Export types and utilities
-export { WorkflowTracker as default }
+/**
+ * Database operations for workflow management
+ */
+export class WorkflowDatabase {
+  static async saveWorkflow(context: WorkflowContext): Promise<void> {
+    try {
+      const collection = db.getCollection<WorkflowDocument>('workflows')
+      const workflow: WorkflowDocument = {
+        batchId: context.batchId,
+        locationId: context.locationId,
+        status: context.errors?.length ? 'failed' : 'active',
+        currentStage: context.stage,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        context
+      }
+      await collection.replaceOne(
+        { batchId: context.batchId },
+        workflow,
+        { upsert: true }
+      )
+      logger.info('📄 Workflow context saved to database', {
+        service: 'workflow-db',
+        batchId: context.batchId,
+        stage: context.stage
+      })
+    } catch (error) {
+      logger.error('Failed to save workflow context', error as Error, {
+        service: 'workflow-db',
+        batchId: context.batchId
+      })
+    }
+  }
+
+  static async getWorkflow(batchId: string): Promise<WorkflowContext | null> {
+    try {
+      const collection = db.getCollection<WorkflowDocument>('workflows')
+      const workflow = await collection.findOne({ batchId })
+      return workflow?.context || null
+    } catch (error) {
+      logger.error('Failed to get workflow context', error as Error, {
+        service: 'workflow-db',
+        batchId
+      })
+      return null
+    }
+  }
+
+  static async saveLocation(context: WorkflowContext): Promise<void> {
+    try {
+      const collection = db.getCollection<LocationDocument>('locations')
+      const location: LocationDocument = {
+        locationId: context.locationId,
+        locationName: context.locationName,
+        countryCode: context.countryCode,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        metadata: {
+          queries: context.metadata.inputQueries
+        }
+      }
+      await collection.replaceOne(
+        { locationId: context.locationId },
+        location,
+        { upsert: true }
+      )
+      logger.info('📍 Location saved to database', {
+        service: 'workflow-db',
+        locationId: context.locationId
+      })
+    } catch (error) {
+      logger.error('Failed to save location', error as Error, {
+        service: 'workflow-db',
+        locationId: context.locationId
+      })
+    }
+  }
+
+  static async saveMediaItem(context: WorkflowContext): Promise<void> {
+    if (!context.itemId || !context.itemUrl) {
+      return // Skip if no media item data
+    }
+    try {
+      const collection = db.getCollection<MediaDocument>('media')
+      const media: MediaDocument = {
+        itemId: context.itemId,
+        itemUrl: context.itemUrl,
+        itemType: context.itemType || 'video',
+        locationId: context.locationId,
+        batchId: context.batchId,
+        processedAt: new Date(),
+        metadata: {
+          analysisResults: context.metadata.analysisResults
+        }
+      }
+      await collection.replaceOne(
+        { itemId: context.itemId },
+        media,
+        { upsert: true }
+      )
+      logger.info('🎬 Media item saved to database', {
+        service: 'workflow-db',
+        itemId: context.itemId,
+        itemType: context.itemType
+      })
+    } catch (error) {
+      logger.error('Failed to save media item', error as Error, {
+        service: 'workflow-db',
+        itemId: context.itemId
+      })
+    }
+  }
+
+  static async getLocationAnalytics(locationId: string) {
+    try {
+      const mediaCollection = db.getCollection<MediaDocument>('media')
+      const workflowCollection = db.getCollection<WorkflowDocument>('workflows')
+      const [totalMedia, activeWorkflows, completedWorkflows] = await Promise.all([
+        mediaCollection.countDocuments({ locationId }),
+        workflowCollection.countDocuments({ locationId, status: 'active' }),
+        workflowCollection.countDocuments({ locationId, status: 'completed' })
+      ])
+      return {
+        locationId,
+        totalMediaItems: totalMedia,
+        activeWorkflows,
+        completedWorkflows,
+        generatedAt: new Date()
+      }
+    } catch (error) {
+      logger.error('Failed to get location analytics', error as Error, {
+        service: 'workflow-db',
+        locationId
+      })
+      return null
+    }
+  }
+}
+
+export default WorkflowTracker
