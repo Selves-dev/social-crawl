@@ -7,6 +7,7 @@ import { serviceBus } from '../shared/serviceBus'
 import { logger } from '../shared/logger'
 import { getSecurityManager } from '../shared/security'
 import { ServiceBusReceiver, ServiceBusSender, ServiceBusReceivedMessage } from '@azure/service-bus'
+import { handlePrepareMedia } from './handlers/handlePrepareMedia'
 
 export interface PrepMediaJob {
   id: string
@@ -14,6 +15,12 @@ export interface PrepMediaJob {
   type: 'image' | 'video'
   metadata?: Record<string, any>
   timestamp: string
+  media?: {
+    video?: string;
+    audio?: string;
+    thumbnail?: string;
+    storyboards?: string[];
+  }
 }
 
 export class PrepMediaThrottleQueue {
@@ -142,9 +149,8 @@ export class PrepMediaThrottleQueue {
   }
 
   private async prepareMedia(job: PrepMediaJob): Promise<void> {
-    // TODO: Implement actual media preparation logic
-    // This is where you'd process the media file
-    await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate work
+    // Delegate to handler
+    handlePrepareMedia(job)
   }
 
   async stop(): Promise<void> {

@@ -5,7 +5,7 @@
 
 import { crawlSearch } from '../../shared/crawlSearch';
 import { uploadJsonToBlob, getBlobName, getPlatform } from '../../shared/azureBlob';
-const logger = (await import('../../shared/logger')).logger;
+import { logger } from '../../shared/logger';
 
 export async function handleMediaScrape(job: { link: string; snippet: string; title: string; workflow: any }) {
   try {

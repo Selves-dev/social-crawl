@@ -62,3 +62,14 @@ async function streamToString(readableStream: NodeJS.ReadableStream | null): Pro
     readableStream.on('error', reject);
   });
 }
+
+// Export getBlobJson for compatibility
+export async function getBlobJson(blobUrl: string): Promise<any> {
+  // Parse the blob URL
+  const url = new URL(blobUrl);
+  const matches = url.pathname.match(/\/([^\/]+)\/([^\/]+)$/);
+  if (!matches) throw new Error('Invalid blob URL');
+  const containerName = matches[1];
+  const blobName = matches[2];
+  return await getJsonFromBlob(containerName, blobName);
+}

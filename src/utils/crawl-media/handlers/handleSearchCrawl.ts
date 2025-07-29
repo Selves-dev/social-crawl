@@ -1,7 +1,7 @@
 import { crawlMediaQueue, downloadQueue, DownloadJob } from '../throttleQueue';
 import { crawlSearch } from '../../shared/crawlSearch';
 import { WorkflowContext } from '../../shared/workflow';
-const logger = (await import('../../shared/logger')).logger;
+import { logger } from '../../shared/logger';
 
 export async function handleSearchCrawl(event: any) {
   try {

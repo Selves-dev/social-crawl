@@ -39,6 +39,7 @@
   "dependencies": {
     "@azure/service-bus": "^7.9.5",
     "@azure/storage-blob": "^12.28.0",
+    "axios": "^1.11.0",
     "cheerio": "^1.1.2",
     "dotenv": "^17.2.1",
     "https-proxy-agent": "^7.0.6",
@@ -47,6 +48,7 @@
     "node-fetch": "3",
     "ofetch": "^1.4.1",
     "playwright": "^1.54.1",
+    "sharp": "^0.34.3",
     "zenrows": "^2.0.1"
   }
 }
