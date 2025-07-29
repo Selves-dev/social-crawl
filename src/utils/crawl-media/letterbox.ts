@@ -5,7 +5,7 @@
 
 
 import { handleSearchCrawl } from "./handlers/handleSearchCrawl";
-import { logger, QueueManager } from "../shared/index";
+import { QueueManager } from "../shared/index";
 
 /**
  * General letterbox entry point for all crawl-media messages.
@@ -14,7 +14,6 @@ import { logger, QueueManager } from "../shared/index";
 export async function letterbox(message: any, context: any) {
   switch (message.type) {
     case 'media-crawl-request': {
-      logger.info('[Crawl-Media] Received media-crawl-request', { message, context, timestamp: new Date().toISOString() });
       await QueueManager.startCrawlMediaProcessing();
       const result = await handleSearchCrawl(message);
       // Only stop the queue if all jobs are finished
@@ -25,7 +24,6 @@ export async function letterbox(message: any, context: any) {
       return result;
     }
     default:
-      logger.warn(`[Crawl-Media] Unknown message type: ${message.type}`, { message, context });
       return { error: 'Unknown message type', type: message.type };
   }
 }

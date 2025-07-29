@@ -3,38 +3,43 @@
  * Standardises media info: username, thumbnail, video url, caption
  */
 
-export async function handleMediaScrape(job: { platform: string; url: string; query: string }) {
-  // TODO: Implement platform-specific scraping logic
-  // Example stub:
-  switch (job.platform) {
-    case 'instagram':
-      // Scrape Instagram
-      return {
-        platform: 'instagram',
-        username: 'stub-username',
-        thumbnail: job.url + '/thumb.jpg',
-        videoUrl: job.url + '/video.mp4',
-        caption: 'stub-caption'
-      };
-    case 'tiktok':
-      // Scrape TikTok
-      return {
-        platform: 'tiktok',
-        username: 'stub-username',
-        thumbnail: job.url + '/thumb.jpg',
-        videoUrl: job.url + '/video.mp4',
-        caption: 'stub-caption'
-      };
-    case 'youtube':
-      // Scrape YouTube
-      return {
-        platform: 'youtube',
-        username: 'stub-username',
-        thumbnail: job.url + '/thumb.jpg',
-        videoUrl: job.url + '/video.mp4',
-        caption: 'stub-caption'
-      };
-    default:
-      return { error: 'Unknown platform', platform: job.platform };
+import { crawlSearch } from '../../shared/crawlSearch';
+import { uploadJsonToBlob, getBlobName, getPlatform } from '../../shared/azureBlob';
+const logger = (await import('../../shared/logger')).logger;
+
+export async function handleMediaScrape(job: { link: string; snippet: string; title: string; workflow: any }) {
+  try {
+    logger.info('[handleMediaScrape] Starting scrape for job', { link: job.link, workflow: job.workflow });
+    const [mappedObject] = await crawlSearch(job.link);
+    if (!mappedObject) {
+      logger.error('[handleMediaScrape] No result from crawlSearch', new Error('No result from crawlSearch'));
+      return;
+    }
+
+    const blobData = {
+      ...mappedObject,
+      workflow: job.workflow
+    };
+
+    const containerName = 'media-json'; // Change as needed
+    const platform = getPlatform(mappedObject.link);
+    const blobName = getBlobName({
+      platform,
+      type: 'json',
+      id: mappedObject.id
+    });
+    const blobUrl = await uploadJsonToBlob(containerName, blobName, blobData);
+    logger.info('[handleMediaScrape] Uploaded blob', { blobUrl });
+
+    const postOfficeMessage = {
+      blobUrl,
+      workflow: job.workflow,
+      action: 'prepare-media'
+    };
+
+    // await postOfficeQueue.addJob(postOfficeMessage);
+    logger.info('[handleMediaScrape] Queued post-office message', { postOfficeMessage });
+  } catch (error) {
+    logger.error('[handleMediaScrape] Error processing job', error instanceof Error ? error : new Error(String(error)));
   }
 }

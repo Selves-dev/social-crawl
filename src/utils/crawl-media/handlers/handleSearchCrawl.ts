@@ -1,47 +1,41 @@
-/**
- * Handles the search part of media crawling
- * Queues URLs for scraping
- */
-import { crawlMediaQueue, CrawlMediaJob } from '../throttleQueue';
+import { crawlMediaQueue, downloadQueue, DownloadJob } from '../throttleQueue';
+import { crawlSearch } from '../../shared/crawlSearch';
+import { WorkflowContext } from '../../shared/workflow';
+const logger = (await import('../../shared/logger')).logger;
 
 export async function handleSearchCrawl(event: any) {
-  // Log received message and data
-  if (event) {
-    const { location, countryCode, query } = event;
-    const logger = (await import('../../shared/logger')).logger;
-    logger.info('[Crawl-Media] Received crawl-media request', {
-      location,
-      countryCode,
-      query,
-      event,
-      timestamp: new Date().toISOString()
-    });
-  }
-  // 1. Get the search query from the event
-  const { query } = event;
+  try {
+    logger.info('[handleSearchCrawl] Received event', { event });
+    const { query } = event;
+    const structuredQuery = structureQuery(query);
+    logger.info('[handleSearchCrawl] Structured query', { structuredQuery });
 
-  // 2. Search Google Video Index for Instagram, TikTok, YouTube
-  const platforms = ['instagram', 'tiktok', 'youtube'];
-  const searchResults: Record<string, string[]> = {};
-  for (const platform of platforms) {
-    // Simulate 15 search results for each platform
-    searchResults[platform] = Array.from({ length: 15 }, (_, i) => `https://${platform}.com/video${i + 1}`);
-  }
+    const searchResults = await crawlSearch(structuredQuery);
+    logger.info('[handleSearchCrawl] Search results', { count: searchResults.length });
 
-  // 3. Add each URL as a job to the throttle queue
-  const jobsQueued: CrawlMediaJob[] = [];
-  for (const platform of platforms) {
-    for (const url of searchResults[platform]) {
-      const job = { platform, url, query };
-      crawlMediaQueue.addJob(job);
+    const jobsQueued: DownloadJob[] = [];
+    const workflow: WorkflowContext = event.workflow || {
+      batchId: event.batchId || '',
+      locationId: event.locationId || '',
+      locationName: event.locationName,
+      countryCode: event.countryCode,
+      stage: 'crawl-media',
+      timestamp: new Date().toISOString(),
+      completedStages: [],
+      metadata: {}
+    };
+    for (const result of searchResults) {
+      const job: DownloadJob = { ...result, workflow };
+      downloadQueue.addJob(job);
       jobsQueued.push(job);
     }
+    logger.info('[handleSearchCrawl] Jobs queued', { count: jobsQueued.length });
+  } catch (error) {
+    logger.error('[handleSearchCrawl] Error processing event', error instanceof Error ? error : new Error(String(error)));
   }
+}
 
-  // Return the list of jobs added
-  return {
-    status: 'success',
-    query,
-    jobsQueued
-  };
+function structureQuery(query: string): string {
+  // TODO: Implement actual query structuring logic
+  return query;
 }

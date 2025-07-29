@@ -67,20 +67,6 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: a
     locationName = 'Parsing failed';
   }
 
-  // Log the result using the main logger
-  // Now, 'locationName', 'countryCode', and 'queries' are clean JS variables
-  logger.info(`[Location-Finder] Next location: ${locationName} (${countryCode}) with ${queries.length} queries.`, {
-    service: 'find-location',
-    location: locationName,      // Clean location string
-    countryCode: countryCode,    // Clean country code
-    queries: queries,            // Clean array of queries
-    workflowContext: workflowContext, // Keep as object, logger will stringify if needed
-    // You might want to log the AI's full response less verbosely, or not at all in INFO level
-    // For debugging, consider a debug-level log instead of info for 'aiResponse'
-    // aiResponse: JSON.stringify(aiResponse), // Original, full AI response (might still be large)
-    timestamp: new Date().toISOString()
-  });
-
   // Persist location details to the database using abstraction
   try {
     await upsertLocationData({
