@@ -6,7 +6,7 @@
 import { logger } from '../shared/logger'
 import { prepMediaQueue, PrepMediaJob } from '../prep-media'
 import { aiServiceQueue, AIJob } from '../ai-service'
-import { crawlMediaQueue, CrawlMediaJob } from '../crawl-media/throttleQueue'
+import { mediaScrape, CrawlMediaJob } from '../crawl-media/throttleQueue'
 export class QueueManager {
   private static prepMediaRunning = false;
   private static aiServiceRunning = false;
@@ -22,7 +22,7 @@ export class QueueManager {
       return;
     }
     try {
-      await crawlMediaQueue.startProcessing();
+      await mediaScrape.startProcessing();
       this.crawlMediaRunning = true;
       logger.info('✅ Crawl media throttle queue started', {
         service: 'queue-manager',
@@ -45,7 +45,7 @@ export class QueueManager {
       return;
     }
     try {
-      await crawlMediaQueue.stop();
+      await mediaScrape.stop();
       this.crawlMediaRunning = false;
       logger.info('⏹️ Crawl media throttle queue stopped', {
         service: 'queue-manager',
@@ -192,7 +192,7 @@ export class QueueManager {
       await Promise.all([
         prepMediaQueue.initialize(),
         aiServiceQueue.initialize(),
-        crawlMediaQueue.initialize()
+        mediaScrape.initialize()
       ])
       logger.info('✅ All throttle queues initialized', { service: 'queue-manager' })
     } catch (error) {
@@ -217,7 +217,7 @@ export class QueueManager {
    * Send job to crawl-media queue
    */
   static async sendCrawlMediaJob(job: CrawlMediaJob): Promise<void> {
-    await crawlMediaQueue.addJob(job)
+    await mediaScrape.addJob(job)
   }
 
   /**

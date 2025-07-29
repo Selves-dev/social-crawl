@@ -77,10 +77,11 @@ export class PostmanProcessor {
 
       const postmanMessage = message.body as PostmanMessage
       const { type, context, payload } = postmanMessage
-
-      logger.info(`📨 Processing postman message: ${type}`, {
+      // Prefer type from workflow if available
+      const workflowType = payload?.workflow?.type || payload?.type || type;
+      logger.info(`📨 Processing postman message: ${workflowType}`, {
         service: 'postman-processor',
-        messageType: type,
+        messageType: workflowType,
         batchId: context.batchId,
         stage: context.stage,
         ...(context.itemId && { itemId: context.itemId })

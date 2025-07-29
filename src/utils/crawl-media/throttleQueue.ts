@@ -28,7 +28,7 @@ export class CrawlMediaThrottleQueue {
   private isInitialized = false;
   private isProcessing = false;
 
-  constructor(maxConcurrentJobs = 5) {
+  constructor(maxConcurrentJobs = 1) {
     this.maxConcurrentJobs = maxConcurrentJobs;
   }
 
@@ -47,17 +47,19 @@ export class CrawlMediaThrottleQueue {
     this.isProcessing = false;
   }
 
-  addJob(job: CrawlMediaJob) {
+  async addJob(job: CrawlMediaJob) {
     this.queue.push(job);
   }
 
   async processJobs(scrapeFn: (job: CrawlMediaJob) => Promise<any>): Promise<any[]> {
     const results: any[] = [];
+    const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
     const processNext = async () => {
       if (this.queue.length === 0) return;
       if (this.activeWorkers >= this.maxConcurrentJobs) return;
       const job = this.queue.shift();
       if (!job) return;
+      await sleep(3000); // Sleep 3 seconds before processing each job
       this.activeWorkers++;
       try {
         const result = await scrapeFn(job);
@@ -99,7 +101,9 @@ export class DownloadThrottleQueue {
     this.isProcessing = false;
   }
 
-  addJob(job: DownloadJob) {
+  async addJob(job: DownloadJob) {
+    const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
+    await sleep(3000);
     this.queue.push(job);
   }
 
@@ -125,5 +129,5 @@ export class DownloadThrottleQueue {
   }
 }
 
-export const crawlMediaQueue = new CrawlMediaThrottleQueue();
-export const downloadQueue = new DownloadThrottleQueue();
+export const mediaScrape = new CrawlMediaThrottleQueue(1);
+export const searchCrawl = new DownloadThrottleQueue(1);

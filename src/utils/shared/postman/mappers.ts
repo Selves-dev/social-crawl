@@ -28,5 +28,11 @@ export const postmanMappers: Record<string, (payload: any, context: any) => Prom
       type: payload.type,
       ...payload
     }, context);
+  },
+  'search-crawl': async (payload, context) => {
+    await crawlMediaLetterbox({
+      type: payload.type,
+      ...payload
+    }, context);
   }
 };

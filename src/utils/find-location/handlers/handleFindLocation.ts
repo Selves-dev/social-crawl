@@ -79,24 +79,29 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: a
     logger.error('Failed to persist location to database', err instanceof Error ? err : undefined);
   }
 
-  // Send each query as a separate message to the post-office for crawl-media (last step)
-  if (Array.isArray(queries) && locationName && countryCode) {
-    for (const query of queries) {
+  // Only send the first query as a message to the post-office for crawl-media
+  if (Array.isArray(queries) && queries.length > 0 && locationName && countryCode) {
+    const query = queries[0];
+    if (!query.includes('google.com')) {
       await sendPostmanMessage({
-        util: 'crawl-media',
+        util: 'search-crawl',
         context: workflowContext,
         payload: {
-          type: 'media-crawl-request',
-          location: locationName,
-          countryCode,
-          query,
-          meta: {
-            source: 'find-location',
-            timestamp: new Date().toISOString()
-          }
+          type: 'search-crawl-queued',
+          jobsQueued: [{
+            location: locationName,
+            countryCode,
+            query,
+            meta: {
+              source: 'find-location',
+              timestamp: new Date().toISOString()
+            }
+          }]
         }
       });
-      logger.info('Sent crawl-media request to post-office', { location: locationName, countryCode, query });
+      logger.info('Sent search-crawl request to post-office', { location: locationName, countryCode, query });
+    } else {
+      logger.info('Skipped sending search-crawl job for google.com query', { query });
     }
   }
 
