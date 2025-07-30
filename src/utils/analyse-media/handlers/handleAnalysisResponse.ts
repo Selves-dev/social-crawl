@@ -1,5 +1,5 @@
 import { logger } from '../../shared/logger';
-import { logger } from '../../shared/logger';
+import { serviceBus } from '../../shared/serviceBus';
 
 export async function handleAnalysisResponse(message: any) {
   logger.info('handleAnalysisResponse called', { message });
@@ -56,5 +56,16 @@ export async function handleAnalysisResponse(message: any) {
 
 // Helper to send message to AI queue
 async function sendAiMessage(aiMessage: any) {
-  // ...existing code to send to AI queue (reuse from handleMediaAnalysis)...
+  const aiQueueName = process.env["ASB-AI-QUEUE"] || 'ai-jobs';
+  if (!serviceBus.isConnected()) {
+    logger.error('Service bus not connected.');
+    throw new Error('Service bus not connected.');
+  }
+  const sender = serviceBus.createQueueSender(aiQueueName);
+  await sender.sendMessages({
+    body: aiMessage,
+    contentType: 'application/json',
+    messageId: aiMessage.blobJson?.id || aiMessage.blobJson?.blobUrl || 'ai-message',
+  });
+  logger.info('Sent AI message to queue', { aiQueueName, aiMessage });
 }

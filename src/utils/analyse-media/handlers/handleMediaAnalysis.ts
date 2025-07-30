@@ -1,39 +1,34 @@
-import { logger } from '../../shared/logger';
-import { buildAnalysisPrompt } from './buildAnalysisPrompt';
-import { analyseMediaLetterbox } from '../letterbox';
-import { serviceBus } from '../../shared/serviceBus';
 
-  logger.info('handleMediaAnalysis called', { message });
+
+export async function handleAnalyseMedia(message: any) {
+  logger.info('handleAnalyseMedia called', { message });
   try {
     // Ensure type is set
     if (!message.type) {
-      message.type = 'handleMediaAnalysis';
+      message.type = 'analyse-media';
     }
+
+    // Ensure workflow is always defined
+    const workflow = message.workflow || {};
 
     // Build analysis prompt
-    const prompt = buildAnalysisPrompt(message.blobJson, message.workflow);
+    const prompt = buildAnalysisPrompt(message.blobJson, workflow);
     logger.info('Built analysis prompt', { prompt });
 
-    // Send message to AI queue for analysis
-    const aiQueueName = process.env["ASB-AI-QUEUE"] || 'ai-jobs';
-    if (!serviceBus.isConnected()) {
-      logger.error('Service bus not connected.');
-      throw new Error('Service bus not connected.');
-    }
-    const sender = serviceBus.createQueueSender(aiQueueName);
-    await sender.sendMessages({
-      body: {
-        type: 'handleAnalysisResponse',
+    // Send to ai-service via postman (image/text only)
+    await sendPostmanMessage({
+      util: 'ai-service',
+      payload: {
+        type: 'ai_request',
         prompt,
-        originalMessage: message
-      },
-      contentType: 'application/json',
-      messageId: message.id || message.blobUrl,
+        mediaUrl,
+        workflow,
+        responseHandler: message.responseHandler || null
+      }
     });
-    logger.info('Sent analysis job to AI queue', { aiQueueName });
+    logger.info('Sent image/text analysis job to ai-service via postman', { mediaUrl });
   } catch (err) {
-    logger.error('Error in handleMediaAnalysis', err instanceof Error ? err : new Error(String(err)), { message });
+    logger.error('Error in handleAnalyseMedia: ' + (err instanceof Error ? err.message : String(err)));
     // Optionally: rethrow or handle error
   }
-  // TODO: Handle AI response in handleAnalysisResponse
 }

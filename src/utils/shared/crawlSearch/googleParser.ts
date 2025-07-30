@@ -14,6 +14,7 @@ export function parseHtml(data: any, searchUrl?: string): CrawlSearchResult[] {
   // Extract /url?q= links and direct social links
   const foundUrls: string[] = [];
 
+
   // 1. /url?q= links
   const urlTagPattern = /<a [^>]*href="\/url\?q=([^&"]+)/g;
   let match;
@@ -25,8 +26,16 @@ export function parseHtml(data: any, searchUrl?: string): CrawlSearchResult[] {
   }
 
   // 2. Direct social links (e.g. <a href="https://instagram.com/...">)
-  const directLinkPattern = /<a [^>]*href="(https?:\/\/(?:www\.)?(instagram\.com|tiktok\.com|youtube\.com|facebook\.com|twitter\.com)[^\s"']+)/gi;
+  const directLinkPattern = /<a [^>]*href="(https?:\/\/(?:www\.)?(instagram\.com|tiktok\.com|youtube\.com)[^\s"']+)/gi;
   while ((match = directLinkPattern.exec(htmlBody)) !== null) {
+    try {
+      foundUrls.push(match[1]);
+    } catch {}
+  }
+
+  // 3. Also match direct social links in the top section
+  const topDirectLinkPattern = /<a [^>]*href="(https?:\/\/(?:www\.)?(instagram\.com|tiktok\.com|youtube\.com)[^\s"']+)/gi;
+  while ((match = topDirectLinkPattern.exec(htmlBody)) !== null) {
     try {
       foundUrls.push(match[1]);
     } catch {}
@@ -46,14 +55,14 @@ export function parseHtml(data: any, searchUrl?: string): CrawlSearchResult[] {
       !url.includes('facebook.com');
   });
   // Remove any google.com domains from results (defensive)
-  const noGoogleUrls = filteredUrls.filter(url => !url.includes('google.com'));
+const noGoogleUrls = filteredUrls.filter(url => !url.toLowerCase().includes('google.com'));
   const uniqueUrls = [...new Set(noGoogleUrls)].sort();
 
   // Optionally include the original search URL as the first result
-  const resultUrls = searchUrl ? [searchUrl, ...uniqueUrls] : uniqueUrls;
+  const resultUrls = uniqueUrls;
 
   console.log('parseHtml found URLs:', resultUrls);
-  return resultUrls.map(url => ({
+  return uniqueUrls.map(url => ({
     link: url,
     username: '',
     title: '',

@@ -17,27 +17,27 @@ export async function shutdownAIServiceQueueIfIdle(checkIsEmpty: () => Promise<b
     }
   }, delayMs)
 }
+
 import { sendPostmanMessage } from '../shared/serviceBus'
-
-
 import { handleModelRequest } from './handlers/handleModelRequest'
 
-/**
- * General letterbox entry point for all ai-service messages.
- * Postman should call this with the message and context.
- */
+
 import { logger } from '../shared/logger'
-export async function letterbox(message: any, context: any) {
+export async function letterbox(message: any) {
+  if (!message.workflow) {
+    throw new Error('[ai-service letterbox] Missing workflow context in message');
+  }
+  const workflowContext = message.workflow;
   switch (message.type) {
     case 'ai_request': {
-      // Pass message as-is; handleModelRequest will determine modelType
-      const aiResult = await handleModelRequest(message, context);
+
+      const aiResult = await handleModelRequest(message, workflowContext);
       if (message.responseHandler && message.responseHandler.util && message.responseHandler.type) {
         await sendPostmanMessage({
           util: message.responseHandler.util,
-          context,
           payload: {
             type: message.responseHandler.type,
+            workflow: workflowContext,
             ...aiResult
           }
         });

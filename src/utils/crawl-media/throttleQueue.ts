@@ -1,28 +1,8 @@
-/**
- * Crawl Media Throttle Queue Utilities
- * Handles concurrent scraping of media URLs
- */
 
+import { SearchCrawlJob, MediaScrapeJob } from '../shared/types';
 
-import { handleMediaScrape } from './handlers/handleMediaScrape';
-// import { WorkflowContext } from '../../shared/workflow';
-
-export interface CrawlMediaJob {
-  platform: string;
-  url: string;
-  query: string;
-}
-
-// Accepts CrawlSearchResult and workflow details
-export interface DownloadJob {
-  link: string;
-  snippet: string;
-  title: string;
-  workflow: any; // Use 'any' for now to avoid import error
-}
-
-export class CrawlMediaThrottleQueue {
-  private queue: CrawlMediaJob[] = [];
+export class SearchCrawlThrottleQueue {
+  private queue: SearchCrawlJob[] = [];
   private activeWorkers = 0;
   private readonly maxConcurrentJobs: number;
   private isInitialized = false;
@@ -36,61 +16,7 @@ export class CrawlMediaThrottleQueue {
     this.isInitialized = true;
   }
 
-  async startProcessing(): Promise<void> {
-    if (!this.isInitialized || this.isProcessing) return;
-    this.isProcessing = true;
-    await this.processJobs(handleMediaScrape);
-  }
-
-  async stop(): Promise<void> {
-    if (!this.isProcessing) return;
-    this.isProcessing = false;
-  }
-
-  async addJob(job: CrawlMediaJob) {
-    this.queue.push(job);
-  }
-
-  async processJobs(scrapeFn: (job: CrawlMediaJob) => Promise<any>): Promise<any[]> {
-    const results: any[] = [];
-    const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
-    const processNext = async () => {
-      if (this.queue.length === 0) return;
-      if (this.activeWorkers >= this.maxConcurrentJobs) return;
-      const job = this.queue.shift();
-      if (!job) return;
-      await sleep(3000); // Sleep 3 seconds before processing each job
-      this.activeWorkers++;
-      try {
-        const result = await scrapeFn(job);
-        results.push(result);
-      } finally {
-        this.activeWorkers--;
-        await processNext();
-      }
-    };
-    const workers = Array.from({ length: this.maxConcurrentJobs }, () => processNext());
-    await Promise.all(workers);
-    return results;
-  }
-}
-
-export class DownloadThrottleQueue {
-  private queue: DownloadJob[] = [];
-  private activeWorkers = 0;
-  private readonly maxConcurrentJobs: number;
-  private isInitialized = false;
-  private isProcessing = false;
-
-  constructor(maxConcurrentJobs = 5) {
-    this.maxConcurrentJobs = maxConcurrentJobs;
-  }
-
-  async initialize(): Promise<void> {
-    this.isInitialized = true;
-  }
-
-  async startProcessing(scrapeFn: (job: DownloadJob) => Promise<any>): Promise<void> {
+  async startProcessing(scrapeFn: (job: SearchCrawlJob) => Promise<any>): Promise<void> {
     if (!this.isInitialized || this.isProcessing) return;
     this.isProcessing = true;
     await this.processJobs(scrapeFn);
@@ -101,13 +27,11 @@ export class DownloadThrottleQueue {
     this.isProcessing = false;
   }
 
-  async addJob(job: DownloadJob) {
-    const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
-    await sleep(3000);
+  async addJob(job: SearchCrawlJob) {
     this.queue.push(job);
   }
 
-  async processJobs(scrapeFn: (job: DownloadJob) => Promise<any>): Promise<any[]> {
+  async processJobs(scrapeFn: (job: SearchCrawlJob) => Promise<any>): Promise<any[]> {
     const results: any[] = [];
     const processNext = async () => {
       if (this.queue.length === 0) return;
@@ -129,5 +53,58 @@ export class DownloadThrottleQueue {
   }
 }
 
-export const mediaScrape = new CrawlMediaThrottleQueue(1);
-export const searchCrawl = new DownloadThrottleQueue(1);
+
+export class CrawlMediaQueue {
+  private queue: MediaScrapeJob[] = [];
+  private activeWorkers = 0;
+  private readonly maxConcurrentJobs: number;
+  private isInitialized = false;
+  private isProcessing = false;
+
+  constructor(maxConcurrentJobs = 1) {
+    this.maxConcurrentJobs = maxConcurrentJobs;
+  }
+
+  async initialize(): Promise<void> {
+    this.isInitialized = true;
+  }
+
+  async startProcessing(scrapeFn: (job: MediaScrapeJob) => Promise<any>): Promise<void> {
+    if (!this.isInitialized || this.isProcessing) return;
+    this.isProcessing = true;
+    await this.processJobs(scrapeFn);
+  }
+
+  async stop(): Promise<void> {
+    if (!this.isProcessing) return;
+    this.isProcessing = false;
+  }
+
+  async addJob(job: MediaScrapeJob) {
+    this.queue.push(job);
+  }
+
+  async processJobs(scrapeFn: (job: MediaScrapeJob) => Promise<any>): Promise<any[]> {
+    const results: any[] = [];
+    const processNext = async () => {
+      if (this.queue.length === 0) return;
+      if (this.activeWorkers >= this.maxConcurrentJobs) return;
+      const job = this.queue.shift();
+      if (!job) return;
+      this.activeWorkers++;
+      try {
+        const result = await scrapeFn(job);
+        results.push(result);
+      } finally {
+        this.activeWorkers--;
+        await processNext();
+      }
+    };
+    const workers = Array.from({ length: this.maxConcurrentJobs }, () => processNext());
+    await Promise.all(workers);
+    return results;
+  }
+}
+
+export const searchCrawlQueue = new SearchCrawlThrottleQueue(1);
+export const crawlMediaQueue = new CrawlMediaQueue(1);

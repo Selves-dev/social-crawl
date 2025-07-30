@@ -39,7 +39,31 @@ export function parseHtml(htmlContent: string): CrawlSearchResult[] {
     const view_count = extractViewCount(ytInitialPlayerResponse);
     const like_count = extractLikeCount(ytInitialData);
 
+    // Extract video id from canonical URL robustly
+    let id: string | undefined = undefined;
+    if (video_url) {
+      // Try to extract the video id from common YouTube URL patterns
+      const match = video_url.match(/[?&]v=([\w-]{11})/) ||
+        video_url.match(/youtube\.com\/watch\?v=([\w-]{11})/) ||
+        video_url.match(/youtube\.com\/embed\/([\w-]{11})/) ||
+        video_url.match(/youtube\.com\/shorts\/([\w-]{11})/);
+      if (match && match[1]) {
+        id = match[1];
+      } else {
+        // Try last segment for canonical URLs like /watch?v= or /shorts/
+        const parts = video_url.split('/');
+        const candidate = parts[parts.length - 1].split('?')[0];
+        // YouTube video ids are 11 characters, alphanumeric, - and _
+        if (/^[\w-]{11}$/.test(candidate)) {
+          id = candidate;
+        } else {
+          id = undefined;
+          console.warn('YouTube parser: Could not extract valid video id from URL:', video_url);
+        }
+      }
+    }
     const result = {
+      id,
       link: video_url,
       username: author,
       title,

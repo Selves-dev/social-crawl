@@ -1,4 +1,3 @@
-
 import { logger } from '../../shared/logger'
 import { sendPostmanMessage } from '../../shared/serviceBus'
 import { db } from '../../shared/database'
@@ -10,6 +9,8 @@ import { upsertLocationData } from './handleLocationData'
  * For now, returns a simple prompt. In future, can use workflow context.
  */
 export async function handleLocationRequest(workflowContext: any) {
+  logger.info('[handleLocationRequest] Received workflowContext:', workflowContext);
+  logger.info('[handleLocationRequest] batchId:', workflowContext?.batchId);
  
   // Build the full prompt using live crawl data
   const { buildLocationInstruction } = await import('./buildLocationPrompt');
@@ -17,10 +18,10 @@ export async function handleLocationRequest(workflowContext: any) {
   // Send message to ai-service letterbox
   await sendPostmanMessage({
     util: 'ai-service',
-    context: workflowContext,
     payload: {
       type: 'ai_request',
       prompt,
+      workflow: workflowContext,
       responseHandler: { util: 'find-location', type: 'find-location-response' },
       options: { maxTokens: 512 }
     }
@@ -37,6 +38,8 @@ export async function handleLocationRequest(workflowContext: any) {
  */
 
 export async function handleLocationResponse(aiResponse: any, workflowContext: any) {
+  logger.info('[handleLocationResponse] Received workflowContext:', workflowContext);
+  logger.info('[handleLocationResponse] batchId:', workflowContext?.batchId);
   
   let parsedAiContent: any = null;
   let locationName: string = 'Unknown location';
@@ -49,10 +52,9 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: a
     if (aiResponse?.text && typeof aiResponse.text === 'string') {
       parsedAiContent = JSON.parse(aiResponse.text);
 
-      // Step 2: Extract the specific fields from the parsed content
-      locationName = parsedAiContent.l || 'Unknown location';
-      countryCode = parsedAiContent.cc || 'Unknown';
-      queries = parsedAiContent.queries || [];
+      locationName = parsedAiContent.l; 
+      countryCode = parsedAiContent.cc;
+      queries = parsedAiContent.queries;
 
     } else {
       logger.warn('AI response text field is missing or not a string, cannot parse location details.', { aiResponse });
@@ -83,15 +85,22 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: a
   if (Array.isArray(queries) && queries.length > 0 && locationName && countryCode) {
     const query = queries[0];
     if (!query.includes('google.com')) {
+      logger.info('[handleLocationResponse] Creating search-crawl job envelope with workflowContext:', workflowContext);
+      logger.info('[handleLocationResponse] batchId for job envelope:', workflowContext?.batchId);
       await sendPostmanMessage({
-        util: 'search-crawl',
+        util: 'crawl-media',
         context: workflowContext,
         payload: {
           type: 'search-crawl-queued',
           jobsQueued: [{
-            location: locationName,
-            countryCode,
-            query,
+            type: 'search-crawl-queued',
+            context: {
+              location: locationName,
+              countryCode,
+              query,
+              // add other context fields as needed
+            },
+            workflow: workflowContext,
             meta: {
               source: 'find-location',
               timestamp: new Date().toISOString()
@@ -100,15 +109,11 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: a
         }
       });
       logger.info('Sent search-crawl request to post-office', { location: locationName, countryCode, query });
+      logger.info('[handleLocationResponse] Sent job envelope with workflowContext:', workflowContext);
+      logger.info('[handleLocationResponse] batchId sent:', workflowContext?.batchId);
     } else {
       logger.info('Skipped sending search-crawl job for google.com query', { query });
     }
   }
 
-  // Optionally, return the location details for further processing
-  return {
-    l: locationName,
-    cc: countryCode,
-    queries: queries
-  };
 }

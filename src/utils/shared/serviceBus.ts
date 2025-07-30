@@ -124,3 +124,5 @@ export function getServiceBusConfigFromEnv(): ServiceBusConfig {
       : 5
   }
 }
+
+export const analyseMediaQueueName = process.env["ASB-ANALYSE-MEDIA-QUEUE"] || 'analyse-media';

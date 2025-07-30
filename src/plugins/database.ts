@@ -1,15 +1,14 @@
+import { defineNitroPlugin } from 'nitropack/runtime'
+import { db } from '../utils/shared/database'
+import { logger } from '../utils/shared/logger'
+
 /**
  * Database Plugin
  * Initializes MongoDB Atlas connection on server startup
  */
 
-import { defineNitroPlugin } from 'nitropack/runtime'
-import { db } from '../utils/shared/database'
-import { logger } from '../utils/shared/logger'
-
 export default defineNitroPlugin(async (nitroApp) => {
   logger.info('🚀 Starting database plugin...', { service: 'database' })
-  
   try {
     const uri = process.env["MONGODB-URI"]
     await db.connect(uri)
@@ -18,8 +17,6 @@ export default defineNitroPlugin(async (nitroApp) => {
     logger.error('❌ Failed to initialize database plugin', error as Error, { service: 'database' })
     logger.warn('Continuing without database connection', { service: 'database' })
   }
-
-  // Handle graceful shutdown
   nitroApp.hooks.hook('close', async () => {
     logger.info('🔄 Closing database connection...', { service: 'database' })
     await db.disconnect()

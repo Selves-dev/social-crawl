@@ -1,6 +1,5 @@
 // Entrypoint for running a crawl search and mapping results
 import fetch from 'node-fetch';
-import { writeFileSync, existsSync, mkdirSync } from 'fs';
 import { parseHtml as parseGoogleHtml } from './googleParser';
 import { parseHtml as parseTiktokHtml } from './tiktokParser';
 import { parseHtml as parseYoutubeHtml } from './youtubeParser';
@@ -21,31 +20,46 @@ function buildGoogleSearchUrl(query: string, platform: string): string {
   return `https://www.google.com/search?${params.toString()}`;
 }
 
-// Entrypoint for running a crawl search and mapping results
-// Main crawlSearch function: search or enrich
 export async function crawlSearch(input: string, platform?: string): Promise<any> {
+
   // If platform is provided, treat as enrichment stage
   if (platform) {
     // Fetch HTML for the link
-    const html = await fetchWithRapidApi(input);
+    const response = await fetchWithRapidApi(input);
+    const html = typeof response === 'string' ? response : response.body;
+    console.log(`[crawlSearch] Fetched HTML for platform: ${platform}, url: ${input}, length: ${html?.length}`);
+    let result;
+    // Nitro does not support fs/file output. Logging only.
     if (platform === 'tiktok') {
-      const [result] = parseTiktokHtml(html);
+      console.log(`[crawlSearch] About to call parseTiktokHtml. Input length: ${html?.length}, first 200 chars: ${typeof html === 'string' ? html.slice(0, 200) : ''}`);
+      [result] = parseTiktokHtml(html);
+      if (!result) {
+        console.warn(`[crawlSearch] TikTok parser returned no result for url: ${input}`);
+      }
       return result;
     } else if (platform === 'youtube') {
-      const [result] = parseYoutubeHtml(html);
+      [result] = parseYoutubeHtml(html);
+      if (!result) {
+        console.warn(`[crawlSearch] YouTube parser returned no result for url: ${input}`);
+      }
       return result;
     } else if (platform === 'instagram') {
       // Uncomment to use static import:
       // const [result] = parseInstagramHtml(html);
+      // if (!result) {
+      //   console.warn(`[crawlSearch] Instagram parser returned no result for url: ${input}`);
+      // }
       // return result;
       return { link: input }; // fallback
     } else {
+      console.warn(`[crawlSearch] Unknown platform or no parser for platform: ${platform}, url: ${input}`);
       return { link: input };
     }
   }
 
   // Otherwise, treat as search stage
   // Search Google for each platform, with random delay between requests
+
   const platforms = ['tiktok', 'youtube', 'instagram'];
   const results: Record<string, string[]> = {};
 
@@ -54,53 +68,42 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
   }
 
   for (const platform of platforms) {
+
     const googleUrl = buildGoogleSearchUrl(input, platform);
     console.log(`[crawlSearch] Building Google search URL for platform: ${platform}`);
     console.log(`[crawlSearch] Google URL: ${googleUrl}`);
+
     try {
       await randomDelay();
       console.log(`[crawlSearch] Fetching Google search results for platform: ${platform}`);
       const googleData = await fetchWithRapidApi(googleUrl);
-      console.log(`[crawlSearch] Fetched Google data for platform: ${platform}, length: ${googleData?.length || 'unknown'}`);
+
       console.log(`[crawlSearch] Parsing Google HTML for platform: ${platform}`);
+
       let htmlToParse = '';
       if (googleData && googleData.body) {
         htmlToParse = googleData.body;
-        console.log(`[crawlSearch] Using 'body' field from ScrapeNinja response for platform: ${platform}`);
-      } else if (googleData && googleData.html) {
-        htmlToParse = googleData.html;
-        console.warn(`[crawlSearch] 'body' field missing, using 'html' field from ScrapeNinja response for platform: ${platform}, url: ${googleUrl}`);
+        console.log(`[crawlSearch] Using 'body' field from response for platform: ${platform}`);
+
       } else {
         console.warn(`[crawlSearch] No body or html found in ScrapeNinja response for platform: ${platform}, url: ${googleUrl}`);
         results[platform] = [];
         continue;
       }
 
-      // Save raw HTML for inspection
-      try {
-        const safeQuery = input.replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 40);
-        const outDir = 'output';
-        const outFile = `${outDir}/${platform}-search-${safeQuery}.html`;
-        // Use static imports for fs helpers (already at top)
-        if (!existsSync(outDir)) {
-          mkdirSync(outDir);
-        }
-        writeFileSync(outFile, htmlToParse);
-        console.log(`[crawlSearch] Saved raw HTML to ${outFile}`);
-      } catch (err) {
-        console.warn(`[crawlSearch] Failed to save raw HTML for platform ${platform}: ${err}`);
-      }
-
+      console.log(`[crawlSearch] (Google) Raw HTML length:`, htmlToParse.length);
       const links = parseGoogleHtml(htmlToParse, googleUrl).map(r => r.link);
       console.log(`[crawlSearch] Parsed ${links.length} links for platform: ${platform}`);
+
       results[platform] = links;
+
     } catch (err) {
       console.error(`[crawlSearch] Google fetch/parse error for ${platform}:`, err);
       results[platform] = [];
     }
   }
 
-  return results;
+  return JSON.stringify(results);
 }
 
 
@@ -112,7 +115,7 @@ export async function fetchWithRapidApi(url: string): Promise<any> {
     throw new Error('RAPIDAPI_KEY is not set in environment variables.');
   }
   const endpoint = 'https://scrapeninja.p.rapidapi.com/scrape';
-  console.log(`[fetchWithRapidApi] Fetching URL: ${url}`);
+  // console.log(`[fetchWithRapidApi] Fetching URL: ${url}`);
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -123,8 +126,8 @@ export async function fetchWithRapidApi(url: string): Promise<any> {
       },
       body: JSON.stringify({ url }),
     });
-    const data = await response.json();
-    console.log(`[fetchWithRapidApi] Response for URL: ${url}, status: ${response.status}, length: ${typeof data === 'string' ? data.length : (data?.length || 'unknown')}`);
+    const data = await response.json() as any;
+
     return data;
   } catch (err) {
     console.error(`[fetchWithRapidApi] Error fetching URL: ${url}`, err);

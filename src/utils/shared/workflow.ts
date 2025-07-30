@@ -41,6 +41,7 @@ export interface WorkflowContext {
     error: string
     timestamp: string
   }>
+  query?: string // Optional query for flow propagation
 }
 
 // Document interfaces for DB

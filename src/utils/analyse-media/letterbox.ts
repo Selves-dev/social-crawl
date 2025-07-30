@@ -1,32 +1,31 @@
 // Letterbox for analyse-media jobs
-import { serviceBus } from '../../shared/serviceBus';
 
-export interface AnalyseMediaJob {
-  id: string;
-  workflow: any;
-  blobUrl: string;
-}
+import { logger } from '../shared/logger';
+import { sendPostmanMessage } from '../shared/serviceBus';
+import { handleAnalyseMedia } from './handlers/handleMediaAnalysis';
 
-export const analyseMediaLetterbox = {
-  type: 'analyse-media',
-  queueName: process.env["ASB-ANALYSE-MEDIA-QUEUE"] || 'analyse-media',
-
-  sendJob: async (job: AnalyseMediaJob) => {
-    try {
-      if (!serviceBus.isConnected()) {
-        throw new Error('Service bus not connected.');
-      }
-      const sender = serviceBus.createQueueSender(analyseMediaLetterbox.queueName);
-      await sender.sendMessages({
-        body: job,
-        contentType: 'application/json',
-        messageId: job.id || job.blobUrl,
-      });
-      // Log success
-      console.log('analyseMediaLetterbox: Job sent', { job });
-    } catch (err) {
-      console.error('analyseMediaLetterbox: Error sending job', err instanceof Error ? err : new Error(String(err)), { job });
-      // Optionally: rethrow or handle error
-    }
+export async function letterbox(message: any) {
+  logger.info('[analyse-media letterbox] Entry', { message });
+  if (!message) {
+    logger.error('[analyse-media letterbox] Message is undefined or null');
+    return { error: 'Message is undefined or null' };
   }
-};
+  if (!('type' in message)) {
+    logger.error('[analyse-media letterbox] Message missing type property: ' + JSON.stringify(message));
+    return { error: 'Message missing type property', message };
+  }
+  if (!message.workflow) {
+    throw new Error('[analyse-media letterbox] Missing workflow context in message');
+  }
+  switch (message.type) {
+    case 'analyse-media': {
+      const analyseResult = await handleAnalyseMedia(message);
+      // Optionally route to next handler or send postman message here
+      logger.info('analyseMediaLetterbox: Job processed', { message, analyseResult });
+      return analyseResult;
+    }
+    default:
+      logger.warn(`[analyse-media] Unknown message type: ${message.type}`, { message });
+      return { error: 'Unknown message type', message };
+  }
+}

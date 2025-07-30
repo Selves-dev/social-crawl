@@ -2,8 +2,8 @@ import { BlobServiceClient } from '@azure/storage-blob';
 
 export function getBlobName({ platform, type = 'json', id }: { platform: string; type?: string; id: string }): string {
   const timestamp = Date.now();
-  const safeId = Buffer.from(id).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
-  return `${platform}/${type}/${safeId}-${timestamp}.${type}`;
+  // Use the id as a directory, e.g. platform/type/id/timestamp.type
+  return `${platform}/${type}/${id}/${timestamp}.${type}`;
 }
 
 export function getPlatform(link: string): string {
@@ -18,13 +18,17 @@ export async function uploadJsonToBlob(containerName: string, blobName: string, 
   const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
   if (!connectionString) throw new Error('AZURE_STORAGE_CONNECTION_STRING not set');
 
+  console.log('[uploadJsonToBlob] Using connection string:', connectionString ? connectionString.slice(0, 20) + '...' : 'undefined');
+  console.log('[uploadJsonToBlob] Container:', containerName, 'Blob:', blobName);
   const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
   const containerClient = blobServiceClient.getContainerClient(containerName);
   await containerClient.createIfNotExists();
+  console.log('[uploadJsonToBlob] Container exists or created:', containerName);
 
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
   const data = JSON.stringify(jsonData);
   await blockBlobClient.upload(data, Buffer.byteLength(data));
+  console.log('[uploadJsonToBlob] Uploaded JSON to blob:', blockBlobClient.url);
 
   return blockBlobClient.url;
 }
@@ -48,6 +52,27 @@ export async function updateJsonInBlob(containerName: string, blobName: string, 
   return await uploadJsonToBlob(containerName, blobName, updatedData);
 }
 
+export async function updateBlobJson(blobUrl: string, updateFn: (data: any) => any): Promise<void> {
+  console.log('[updateBlobJson] Called with blobUrl:', blobUrl);
+  const blobJson = await getBlobJson(blobUrl);
+  console.log('[updateBlobJson] Fetched blob JSON:', blobJson);
+  const updatedJson = updateFn(blobJson);
+  console.log('[updateBlobJson] Updated JSON:', updatedJson);
+  const url = new URL(blobUrl);
+  const matches = url.pathname.match(/\/([^\/]+)\/(.+)$/);
+  if (!matches) throw new Error('Invalid blob URL');
+  const containerName = matches[1];
+  const blobName = matches[2];
+  console.log('[updateBlobJson] Container:', containerName, 'Blob:', blobName);
+  const blobServiceClient = getBlobServiceClient();
+  if (!blobServiceClient) throw new Error('Missing Azure Storage connection string');
+  console.log('[updateBlobJson] Using connection string:', process.env.AZURE_STORAGE_CONNECTION_STRING ? process.env.AZURE_STORAGE_CONNECTION_STRING.slice(0, 20) + '...' : 'undefined');
+  const container = blobServiceClient.getContainerClient(containerName);
+  const blob = container.getBlockBlobClient(blobName);
+  await blob.upload(JSON.stringify(updatedJson), Buffer.byteLength(JSON.stringify(updatedJson)), { blobHTTPHeaders: { blobContentType: 'application/json' } });
+  console.log('[updateBlobJson] Uploaded updated JSON to blob:', blob.url);
+}
+
 // Helper to convert stream to string
 async function streamToString(readableStream: NodeJS.ReadableStream | null): Promise<string> {
   if (!readableStream) return '';
@@ -67,9 +92,19 @@ async function streamToString(readableStream: NodeJS.ReadableStream | null): Pro
 export async function getBlobJson(blobUrl: string): Promise<any> {
   // Parse the blob URL
   const url = new URL(blobUrl);
-  const matches = url.pathname.match(/\/([^\/]+)\/([^\/]+)$/);
-  if (!matches) throw new Error('Invalid blob URL');
-  const containerName = matches[1];
-  const blobName = matches[2];
+  // Remove leading slash and split
+  const segments = url.pathname.replace(/^\//, '').split('/');
+  if (segments.length < 2) throw new Error('Invalid blob URL');
+  const containerName = segments[0];
+  const blobName = segments.slice(1).join('/');
   return await getJsonFromBlob(containerName, blobName);
+}
+
+export function getBlobServiceClient(): BlobServiceClient | null {
+  const connectionString = process.env["AZURE_STORAGE_CONNECTION_STRING"];
+  if (!connectionString) {
+    // Optionally log error here, or let caller handle
+    return null;
+  }
+  return BlobServiceClient.fromConnectionString(connectionString);
 }
