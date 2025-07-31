@@ -1,11 +1,12 @@
+
 import { spawn } from 'child_process';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
-import { getBlobServiceClient } from '../../shared/azureBlob';
+import { getBlobServiceClient } from '../../utils/shared/azureBlob';
 import { logger } from '../../shared/logger';
 import axios from 'axios';
-import { generateBlobSasUrl } from '../../shared/azureBlob';
+import { generateBlobSasUrl } from '../../utils/shared/azureBlob';
 
 export async function handleDownload(blobId: string, mediaUrl: string, blobServiceClient: any, containerName: string) {
   if (!blobServiceClient) {
@@ -102,3 +103,4 @@ export async function handleDownloadThumbnail(blobId: string, thumbUrl: string, 
   const thumbSasUrl = await generateBlobSasUrl(thumbBlob);
   return thumbSasUrl;
 }
+

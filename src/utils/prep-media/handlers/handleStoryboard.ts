@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import { spawn } from 'child_process';
 import sharp from 'sharp';
 import { BlobServiceClient } from '@azure/storage-blob';
-import { generateBlobSasUrl } from '../../shared/azureBlob';
+import { generateBlobSasUrl } from '../../utils/shared/azureBlob';
 
 export async function extractVideoSegments(tmpVideoPath: string, segmentDir: string): Promise<string[]> {
   logger.info('Creating segment directory', { segmentDir });
@@ -64,14 +64,27 @@ export async function extractVideoSegments(tmpVideoPath: string, segmentDir: str
 
 // ...removed duplicate code...
 
-export async function handleStoryboard(tmpVideoPath: string, blobServiceClient: BlobServiceClient, containerName: string, blobId: string): Promise<string[]> {
-  logger.info('handleStoryboard: extracting segments', { tmpVideoPath, blobId });
+export async function handleStoryboard(
+  tmpVideoPath: string,
+  blobServiceClient: BlobServiceClient,
+  containerName: string,
+  blobId: string,
+  platform: string = 'tiktok',
+  videoUrl?: string
+): Promise<string[]> {
+  // Detect isShorts for YouTube
+  let isShorts = false;
+  if (platform === 'youtube' && videoUrl && videoUrl.includes('/shorts/')) {
+    isShorts = true;
+  }
+
+  logger.info('handleStoryboard: extracting segments', { tmpVideoPath, blobId, platform, isShorts, videoUrl });
   const segmentDir = path.join(os.tmpdir(), `${blobId}-segments`);
   const segmentPaths = await extractVideoSegments(tmpVideoPath, segmentDir);
   logger.info('handleStoryboard: segmentPaths', { segmentPaths });
   const gridSize = 4;
-  const thumbWidth = 180;
-  const thumbHeight = 320;
+  // Use dynamic dimensions
+  const { width: thumbWidth, height: thumbHeight } = getOutputDimensions(platform, isShorts);
   const blankImagePath = path.resolve(process.cwd(), 'src/assets/blank.jpg');
   const storyboardUrls: string[] = [];
   for (let i = 0; i < segmentPaths.length; i += gridSize * gridSize) {
@@ -82,11 +95,11 @@ export async function handleStoryboard(tmpVideoPath: string, blobServiceClient: 
       gridImages.push(blankImagePath);
     }
     logger.info('Final grid images (with blanks)', { gridImages });
-    // Ensure all images are 180x320
+    // Ensure all images are sized according to platform
     const resizedBuffers: Buffer[] = [];
     for (const imgPath of gridImages) {
       const buf = await fs.promises.readFile(imgPath);
-      const resized = await sharp(buf).resize(180, 320).toBuffer();
+      const resized = await sharp(buf).resize(thumbWidth, thumbHeight).toBuffer();
       resizedBuffers.push(resized);
     }
     // Prepare composite array for sharp
@@ -121,4 +134,24 @@ export async function handleStoryboard(tmpVideoPath: string, blobServiceClient: 
     storyboardUrls.push(storyboardSasUrl);
   }
   return storyboardUrls;
+}
+
+// Utility to determine output dimensions based on platform/source
+function getOutputDimensions(platform: string, isShorts: boolean = false) {
+  // Default portrait (TikTok, Instagram)
+  let width = 720;
+  let height = 1280;
+
+  if (platform === 'youtube') {
+    if (isShorts) {
+      // YouTube Shorts: portrait
+      width = 720;
+      height = 1280;
+    } else {
+      // Regular YouTube: landscape
+      width = 1280;
+      height = 720;
+    }
+  }
+  return { width, height };
 }

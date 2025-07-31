@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 import { Buffer } from 'buffer';
 import fetch from 'node-fetch'
 import { logger } from '../../shared/logger'
-import { getBlobJson } from '../../shared/azureBlob'
+import { getBlobJson } from '../../utils/shared/azureBlob'
 import type { BlobManifest } from '../../shared/types'
 
 function getAzureOpenAIConfig() {

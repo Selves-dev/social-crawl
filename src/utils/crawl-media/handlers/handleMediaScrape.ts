@@ -5,7 +5,7 @@ import { parseHtml as parseYoutubeHtml } from '../../shared/crawlSearch/youtubeP
 // import { parseHtml as parseInstagramHtml } from '../../shared/crawlSearch/instagramParser';
 import type { MediaObject } from '../../shared/crawlSearch/types';
 import { MediaScrapeJob } from '../../shared/types';
-import { uploadJsonToBlob, getBlobName, getPlatform } from '../../shared/azureBlob';
+import { uploadJsonToBlob, getBlobName, getPlatform } from '../../utils/shared/azureBlob';
 import type { BlobManifest } from '../../shared/types';
 import { logger } from '../../shared/logger';
 import { sendPostmanMessage } from '../../shared/serviceBus';

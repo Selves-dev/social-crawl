@@ -1,5 +1,5 @@
 import { logger } from '../../shared/logger';
-import { getBlobJson, getBlobServiceClient, updateBlobJson } from '../../shared/azureBlob';
+import { getBlobJson, getBlobServiceClient, updateBlobJson } from '../../utils/shared/azureBlob';
 import type { BlobManifest } from '../../shared/types';
 import axios from 'axios';
 import { spawn } from 'child_process';
@@ -68,8 +68,22 @@ export async function handlePrepareMedia(message: any) {
   // 3. Build 4x4 storyboard grid(s) using sharp (helper) and extract segments
   let storyboardUrls: string[] = [];
   try {
-    logger.info('Calling handleStoryboard', { tmpVideoPath, blobId: blobJson.id });
-    storyboardUrls = await handleStoryboard(tmpVideoPath, blobServiceClient, mediaContainerName, blobJson.id);
+    // Infer platform from blobJson.link
+    let platform = 'unknown';
+    if (blobJson.link) {
+      if (blobJson.link.includes('youtube.com')) platform = 'youtube';
+      else if (blobJson.link.includes('tiktok.com')) platform = 'tiktok';
+      else if (blobJson.link.includes('instagram.com')) platform = 'instagram';
+    }
+    logger.info('Calling handleStoryboard', { tmpVideoPath, blobId: blobJson.id, platform, videoUrl: blobJson.link });
+    storyboardUrls = await handleStoryboard(
+      tmpVideoPath,
+      blobServiceClient,
+      mediaContainerName,
+      blobJson.id,
+      platform,
+      blobJson.link
+    );
     logger.info('handleStoryboard returned', { storyboardUrls });
     media.push({ type: 'storyboards', url: storyboardUrls.join(',') });
   } catch (err) {
