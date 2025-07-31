@@ -1,3 +1,4 @@
+import type { LetterboxHandler } from '../shared/letterboxTypes';
 
 import { QueueManager } from '../index';
 import { handlePrepareMedia } from './handlers/handlePrepareMedia';
@@ -22,27 +23,24 @@ export async function shutdownPrepMediaQueueIfIdle(checkIsEmpty: () => Promise<b
     }
   }, delayMs);
 }
-export async function letterbox(message: any) {
+export const letterbox: LetterboxHandler = async (message) => {
   if (!message) {
     logger.error('[prep-media letterbox] Message is undefined or null');
     return { error: 'Message is undefined or null' };
   }
-  if (!('type' in message)) {
-    logger.error('[prep-media letterbox] Message missing type property', { message });
-    return { error: 'Message missing type property', message };
-  }
   if (!message.workflow) {
     throw new Error('[prep-media letterbox] Missing workflow context in message');
   }
-  switch (message.type) {
-    case 'prep-media-job': {
-      const prepResult = await handlePrepareMedia(message);
-      // Optionally route to next handler or send postman message here
-      // Example: sendPostmanMessage({ util: 'next-util', payload: { ... } });
-      return { status: 'prep-media-processed', prepResult };
-    }
-    default:
-      logger.warn(`[prep-media] Unknown message type: ${message.type}`, { message });
-      return { error: 'Unknown message type', type: message.type };
-  }
+  // Always process as prep-media job
+  const prepResult = await handlePrepareMedia(message);
+  // Optionally route to next handler or send postman message here
+  // Example: sendPostmanMessage({ util: 'next-util', payload: { ... } });
+  return { status: 'prep-media-processed', prepResult };
 }
+letterbox.initializeQueue = async () => {
+  await QueueManager.startPrepMediaProcessing();
+};
+
+letterbox.shutdownQueue = async () => {
+  await QueueManager.stopPrepMediaProcessing();
+};

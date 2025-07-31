@@ -1,5 +1,5 @@
 import { logger } from '../../shared/logger';
-import { getBlobJson, getBlobServiceClient, updateBlobJson } from '../../utils/shared/azureBlob';
+import { getBlobJson, getBlobServiceClient, updateBlobJson } from '../../shared/azureBlob';
 import type { BlobManifest } from '../../shared/types';
 import axios from 'axios';
 import { spawn } from 'child_process';
@@ -21,19 +21,7 @@ export async function handlePrepareMedia(message: any) {
   try {
     blobJson = await getBlobJson(blobUrl) as BlobManifest;
     logger.info('Fetched blob JSON', { blobJson });
-    // Ensure id is set from link if missing
-    if (!blobJson.id && blobJson.link) {
-      // TikTok
-      let match = blobJson.link.match(/tiktok\.com\/[^\/]+\/video\/(\d+)/);
-      if (match) blobJson.id = match[1];
-      // Instagram
-      match = blobJson.link.match(/instagram\.com\/reel\/([\w-]+)/);
-      if (match) blobJson.id = match[1];
-      // YouTube
-      match = blobJson.link.match(/(?:v=|\/embed\/|\/shorts\/|\/watch\/)([\w-]+)/);
-      if (match) blobJson.id = match[1];
-      logger.info('Set blobJson.id from link', { id: blobJson.id });
-    }
+    // Use mediaId from mapped object only
   } catch (err) {
     logger.error('Failed to fetch blob JSON', err instanceof Error ? err : new Error(String(err)));
     return;
@@ -49,6 +37,20 @@ export async function handlePrepareMedia(message: any) {
   // Always use 'media' container for all blob operations
   const mediaContainerName = 'media';
 
+  // Determine platform and mediaId for folder structure
+  let platform = 'unknown';
+  if (blobJson.link) {
+    if (blobJson.link.includes('youtube.com')) platform = 'youtube';
+    else if (blobJson.link.includes('tiktok.com')) platform = 'tiktok';
+    else if (blobJson.link.includes('instagram.com')) platform = 'instagram';
+  }
+  const id = blobJson.mediaId;
+  if (!id) {
+    logger.error('Could not determine mediaId from mapped object, aborting.');
+    return;
+  }
+  const baseFolder = `${platform}/json/${id}`;
+
   // 2. Download video and audio, upload to blob
   let tmpVideoPath = path.join(os.tmpdir(), `${blobJson.id}-video.mp4`);
   try {
@@ -56,7 +58,10 @@ export async function handlePrepareMedia(message: any) {
       logger.error('No video link found in blobJson');
       return;
     }
-    const downloadResults = await handleDownload(blobJson.id, blobJson.link, blobServiceClient, mediaContainerName);
+    // Use baseFolder for video/audio blob names
+    const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, "");
+    const assetBaseName = `${baseFolder}/${platform}-${id}-${timestamp}`;
+    const downloadResults = await handleDownload(assetBaseName, blobJson.link, blobServiceClient, mediaContainerName);
     media.push({ type: 'video', url: downloadResults.video });
     media.push({ type: 'audio', url: downloadResults.audio });
     logger.info('Downloaded and uploaded media', { video: downloadResults.video, audio: downloadResults.audio });
@@ -68,19 +73,15 @@ export async function handlePrepareMedia(message: any) {
   // 3. Build 4x4 storyboard grid(s) using sharp (helper) and extract segments
   let storyboardUrls: string[] = [];
   try {
-    // Infer platform from blobJson.link
-    let platform = 'unknown';
-    if (blobJson.link) {
-      if (blobJson.link.includes('youtube.com')) platform = 'youtube';
-      else if (blobJson.link.includes('tiktok.com')) platform = 'tiktok';
-      else if (blobJson.link.includes('instagram.com')) platform = 'instagram';
-    }
     logger.info('Calling handleStoryboard', { tmpVideoPath, blobId: blobJson.id, platform, videoUrl: blobJson.link });
+    // Use baseFolder for storyboard blob names
+    const timestampStoryboard = new Date().toISOString().replace(/[-:.TZ]/g, "");
+    const storyboardAssetName = `${baseFolder}/${platform}-${id}-${timestampStoryboard}`;
     storyboardUrls = await handleStoryboard(
       tmpVideoPath,
       blobServiceClient,
       mediaContainerName,
-      blobJson.id,
+      storyboardAssetName,
       platform,
       blobJson.link
     );
@@ -92,11 +93,13 @@ export async function handlePrepareMedia(message: any) {
 
   // 4. Download thumbnail from the URL by streaming to blob
   try {
-    const thumbUrl = blobJson.thumbnailUrl || message.thumbnailUrl;
+    const thumbUrl = blobJson.thumbnail || blobJson.thumbnailUrl || message.thumbnailUrl;
     if (thumbUrl) {
-      const thumbnailUrl = await handleDownloadThumbnail(blobJson.id, thumbUrl, blobServiceClient, mediaContainerName);
+      const thumbTimestamp = new Date().toISOString().replace(/[-:.TZ]/g, "");
+      const thumbAssetName = `${baseFolder}/${platform}-${id}-${thumbTimestamp}-thumbnail.jpg`;
+      const thumbnailUrl = await handleDownloadThumbnail(thumbAssetName, thumbUrl, blobServiceClient, mediaContainerName);
       media.push({ type: 'thumbnail', url: thumbnailUrl });
-      logger.info('Streamed thumbnail to blob', { blobName: `${blobJson.id}-thumbnail.jpg`, thumbnail: thumbnailUrl });
+      logger.info('Streamed thumbnail to blob', { thumbnail: thumbnailUrl });
     } else {
       logger.warn('No thumbnail URL provided');
     }

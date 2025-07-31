@@ -15,7 +15,8 @@ const exampleMappedObject = {
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
-  const mediaUrl = body?.blobUrl || 'https://socialcrawlstorage.blob.core.windows.net/media/tiktok/json/7406384787121802528/1753900675711.json';
+  // Use YouTube Shorts blob for test
+  const mediaUrl = body?.blobUrl || 'https://socialcrawlstorage.blob.core.windows.net/media/youtube/json/d_1qcZb-S80/1753959708011.json';
   const workflow = body?.workflow || { batchId: 'test-batch', stage: 'prep-media', timestamp: new Date().toISOString() };
   // Call the actual handler
   await handlePrepareMedia({ workflow, blobUrl: mediaUrl, mediaUrl });

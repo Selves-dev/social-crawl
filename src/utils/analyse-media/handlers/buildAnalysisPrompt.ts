@@ -25,8 +25,7 @@ export function buildAnalysisPrompt(blobJson: any, workflow: any): string {
     '3. **Strict JSON Output:** Adhere to the structure and field rules below.',
     '',
     '### FIELD-BY-FIELD RULES ###',
-    '* Use context (from blobJson.context) only for reasoning and disambiguation. Do NOT include context in the output JSON.',
-    '* mediaId, source, permalink: Copy directly from blobJson. source is the only platform field.',
+    '* mediaId, source, permalink and context: Copy directly from blobJson. source is the only platform field.',
     '* username: From blobJson.username or extract from permalink.',
     '* createdAt, updatedAt, date: Date strings. Use "" if unknown/undetermined, not null.',
     '* mediaType: "video", "carousel", "image", or "other".',
@@ -36,6 +35,8 @@ export function buildAnalysisPrompt(blobJson: any, workflow: any): string {
     '* slug: URL-friendly. From adminTitle + mediaId (e.g., "A Cool Place! 123" -> "a-cool-place-123"). Fallback: from permalink.',
     '* caption: From blobJson.caption or fallback to adminTitle. Tidy: remove excess whitespace, line breaks, emojis, redundant punctuation, slogans, external links. Focus on clean narrative.',
     '* mediaDescription: Long, objective, detailed summary of distinct visual elements and actions in storyboard images. Only what is seen. No opinions or subjective interpretations.',
+    '* likeCount: (number) Copy directly from blobJson. If not present or invalid, use null.',
+    '* viewCount: (number) Copy directly from blobJson. If not present or invalid, use null.',
     '* **places**: (array of objects) Specific, bookable venues/businesses, or well-defined landmarks that are distinct points of interest (e.g., hotels, restaurants, museums, specific bridges, specific towers). Each object must have:',
     '    * **name**: (string) The name of the place.',
     '    * **confidence**: (float 0.0-1.0) Confidence score; 1.0 for visual certainty.',
@@ -44,6 +45,10 @@ export function buildAnalysisPrompt(blobJson: any, workflow: any): string {
     '    * **name**: (string) The name of the location.',
     '    * **confidence**: (float 0.0-1.0) Confidence score; 1.0 for visual certainty.',
     '    * **Prioritization**: Clear visual identification > Contextual refinement (using blobJson context, query) > Textual fallback (caption, adminTitle).',
+    '* **context**: (object) Provides high-level geographic and keyword context.',
+    '    * **l**: (string) The most prominent identified location (e.g., "London", "Lofoten"). Prioritize `Locations` then `Places`. If multiple, pick the most specific or central. If none, extract from `caption` or `adminTitle`. Use "" if truly unknown.',
+    '    * **cc**: (string) The two-letter country code (ISO 3166-1 alpha-2) for the primary location (e.g., "GB" for Great Britain, "NO" for Norway). Prioritize `Locations` then `Places`. If none, infer from `caption` or `adminTitle`. Use "" if truly unknown.',
+    '    * **w**: (string) A space-separated list of highly relevant keywords or tags summarizing the content. Include words from `caption` hashtags, `adminTitle`, and key visual themes identified in `mediaDescription`.',
     '* Default Values: If a field value cannot be determined and no specific rule applies, use null. Do not invent info.',
     '',
     '### CRITICAL OUTPUT FORMAT RULES ###',
@@ -53,6 +58,6 @@ export function buildAnalysisPrompt(blobJson: any, workflow: any): string {
     '* Indentation: 2-space.',
     '',
     '### EXAMPLE OUTPUT ###',
-    '{"mediaId":"v54321","source":"instagram","permalink":"https://www.instagram.com/p/CXYZUVW/london_places/","username":"londonwanderer","createdAt":"2023-10-26T10:30:00Z","date":"2023-10-26","adminTitle":"Exploring London\'s Historic Tower Bridge Area","caption":"Had such an amazing day near #TowerBridge in London! Definitely recommend this area for families. #London #FamilyFun #UK #Travel @TowerBridge @TheShardLondon.","mediaDescription":"this video shows a family walking near Tower Bridge in London, with views of the Shard in the background. The area is bustling with tourists and locals enjoying the sunny day.","places":[{"name":"Tower Bridge","confidence":1.0},{"name":"The Shard London","confidence":0.9}],"locations":[{"name":"London","confidence":1.0},{"name":"UK","confidence":1.0}]}'
+    '{"mediaId":"v54321","source":"instagram","permalink":"https://www.instagram.com/p/CXYZUVW/london_places/","username":"londonwanderer","createdAt":"2023-10-26T10:30:00Z","date":"2023-10-26","adminTitle":"Exploring London\'s Historic Tower Bridge Area","caption":"Had such an amazing day near #TowerBridge in London! Definitely recommend this area for families. #London #FamilyFun #UK #Travel @TowerBridge @TheShardLondon.","mediaDescription":"this video shows a family walking near Tower Bridge in London, with views of the Shard in the background. The area is bustling with tourists and locals enjoying the sunny day.","likeCount":15230,"viewCount":876543,"places":[{"name":"Tower Bridge","confidence":1.0},{"name":"The Shard London","confidence":0.9}],"locations":[{"name":"London","confidence":1.0},{"name":"UK","confidence":1.0}],"context":{"l":"London","cc":"GB","w":"TowerBridge London FamilyFun UK Travel"}}'
   ].join('\n');
 }

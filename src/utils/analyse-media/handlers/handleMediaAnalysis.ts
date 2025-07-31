@@ -1,7 +1,7 @@
 import { logger } from '../../shared/logger';
 import { buildAnalysisPrompt } from '../handlers/buildAnalysisPrompt';
 import { sendPostmanMessage } from '../../shared/serviceBus';
-import { getBlobJson } from '../../utils/shared/azureBlob';
+import { getBlobJson } from '../../shared/azureBlob';
 
 export async function handleAnalyseMedia(message: any) {
   logger.info('handleAnalyseMedia called', { message });

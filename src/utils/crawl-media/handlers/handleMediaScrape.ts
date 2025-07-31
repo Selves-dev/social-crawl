@@ -5,7 +5,7 @@ import { parseHtml as parseYoutubeHtml } from '../../shared/crawlSearch/youtubeP
 // import { parseHtml as parseInstagramHtml } from '../../shared/crawlSearch/instagramParser';
 import type { MediaObject } from '../../shared/crawlSearch/types';
 import { MediaScrapeJob } from '../../shared/types';
-import { uploadJsonToBlob, getBlobName, getPlatform } from '../../utils/shared/azureBlob';
+import { uploadJsonToBlob, getBlobName, getPlatform } from '../../shared/azureBlob';
 import type { BlobManifest } from '../../shared/types';
 import { logger } from '../../shared/logger';
 import { sendPostmanMessage } from '../../shared/serviceBus';
@@ -35,6 +35,7 @@ export async function handleMediaScrape(job: MediaScrapeJob) {
       return;
     }
 
+
     // Upload mappedObject to Azure Blob and route blob URL to prep-media
     try {
       if (!job.workflow) {
@@ -43,12 +44,18 @@ export async function handleMediaScrape(job: MediaScrapeJob) {
       }
       const workflow = job.workflow;
       const containerName = 'media';
-      const blobName = getBlobName({ platform, id: mappedObject.id || job.link });
+      // Use mediaId or id, never link
+      const id = mappedObject.mediaId || mappedObject.id;
+      if (!id) {
+        logger.error('[handleMediaScrape] Cannot determine unique id for blob naming');
+        return;
+      }
+      const blobName = getBlobName({ platform, id });
       logger.info('[handleMediaScrape] Uploading mappedObject to blob', { containerName, blobName });
       const blobUrl = await uploadJsonToBlob(containerName, blobName, mappedObject);
       logger.info('[handleMediaScrape] Routing blobUrl to post-office for prep-media', { blobUrl, workflow });
       await sendPostmanMessage({
-        type: 'prep-media',
+        util: 'prep-media',
         context: workflow,
         payload: {
           blobUrl

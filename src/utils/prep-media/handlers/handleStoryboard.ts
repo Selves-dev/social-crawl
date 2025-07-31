@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import { spawn } from 'child_process';
 import sharp from 'sharp';
 import { BlobServiceClient } from '@azure/storage-blob';
-import { generateBlobSasUrl } from '../../utils/shared/azureBlob';
+import { generateBlobSasUrl } from '../../shared/azureBlob';
 
 export async function extractVideoSegments(tmpVideoPath: string, segmentDir: string): Promise<string[]> {
   logger.info('Creating segment directory', { segmentDir });
@@ -68,8 +68,8 @@ export async function handleStoryboard(
   tmpVideoPath: string,
   blobServiceClient: BlobServiceClient,
   containerName: string,
-  blobId: string,
-  platform: string = 'tiktok',
+  assetBaseName: string,
+  platform: string,
   videoUrl?: string
 ): Promise<string[]> {
   // Detect isShorts for YouTube
@@ -78,8 +78,8 @@ export async function handleStoryboard(
     isShorts = true;
   }
 
-  logger.info('handleStoryboard: extracting segments', { tmpVideoPath, blobId, platform, isShorts, videoUrl });
-  const segmentDir = path.join(os.tmpdir(), `${blobId}-segments`);
+  logger.info('handleStoryboard: extracting segments', { tmpVideoPath, assetBaseName, platform, videoUrl });
+  const segmentDir = path.join(os.tmpdir(), `${assetBaseName}-segments`);
   const segmentPaths = await extractVideoSegments(tmpVideoPath, segmentDir);
   logger.info('handleStoryboard: segmentPaths', { segmentPaths });
   const gridSize = 4;
@@ -123,10 +123,10 @@ export async function handleStoryboard(
       .toBuffer();
     // Save to temp file
     const gridIdx = Math.floor(i / (gridSize * gridSize));
-    const storyboardPath = path.join(os.tmpdir(), `${blobId}-storyboard-${gridIdx}.jpg`);
+    const storyboardPath = path.join(os.tmpdir(), `${assetBaseName}-storyboard-${gridIdx}.jpg`);
     fs.writeFileSync(storyboardPath, storyboardBuffer);
     // Upload to blob
-    const storyboardBlobName = `${blobId}-storyboard-${gridIdx}.jpg`;
+    const storyboardBlobName = `${assetBaseName}-storyboard-${gridIdx}.jpg`;
     const storyboardBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(storyboardBlobName);
     await storyboardBlob.uploadFile(storyboardPath);
     logger.info('Uploaded storyboard to blob', { blobName: storyboardBlobName });
@@ -138,19 +138,19 @@ export async function handleStoryboard(
 
 // Utility to determine output dimensions based on platform/source
 function getOutputDimensions(platform: string, isShorts: boolean = false) {
-  // Default portrait (TikTok, Instagram)
-  let width = 720;
-  let height = 1280;
+  // Default portrait (TikTok, Instagram, YouTube Shorts)
+  let width = 240;
+  let height = 426;
 
   if (platform === 'youtube') {
     if (isShorts) {
       // YouTube Shorts: portrait
-      width = 720;
-      height = 1280;
+      width = 240;
+      height = 426;
     } else {
       // Regular YouTube: landscape
-      width = 1280;
-      height = 720;
+      width = 426;
+      height = 240;
     }
   }
   return { width, height };

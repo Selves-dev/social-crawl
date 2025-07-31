@@ -1,11 +1,13 @@
 import { searchCrawlQueue, crawlMediaQueue } from '../crawl-media/throttleQueue';
 import type { SearchCrawlJob, MediaScrapeJob, PrepMediaJob, AIServiceJob } from './types';
+import * as azureBlobUtils from '../../utils/shared/azureBlob';
 import { prepMediaQueue } from '../prep-media/throttleQueue';
 import { aiServiceQueue } from '../ai-service/throttleQueue';
 import { logger } from './logger';
 import { analyseMediaQueue } from '../analyse-media/throttleQueue';
 
 // Use the singleton prepMediaQueue exported from throttleQueue.ts
+// Use azureBlobUtils for all blob operations
 
 export class QueueManager {
   // --- AI SERVICE QUEUE ---
@@ -100,7 +102,20 @@ export class QueueManager {
     }
     try {
       const { handleSearchCrawl } = await import('../crawl-media/handlers/handleSearchCrawl');
-      await searchCrawlQueue.startProcessing(handleSearchCrawl);
+      // Adapter: convert SearchCrawlJob to JobEnvelope<SearchCrawlContext>
+      const handler = async (job) => {
+        // job: SearchCrawlJob
+        const envelope = {
+          type: job.type || 'search-crawl',
+          context: {
+            query: job.query || '',
+            platform: job.platform
+          },
+          workflow: job.workflow
+        };
+        return handleSearchCrawl(envelope);
+      };
+      await searchCrawlQueue.startProcessing(handler);
       this.searchCrawlRunning = true;
       logger.info('✅ Search crawl throttle queue started', {
         service: 'queue-manager',

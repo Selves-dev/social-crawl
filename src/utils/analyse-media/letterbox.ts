@@ -1,11 +1,12 @@
+import type { LetterboxHandler } from '../shared/letterboxTypes';
+import { QueueManager } from '../shared/queueManager';
 // Letterbox for analyse-media jobs
 
 import { logger } from '../shared/logger';
 import { sendPostmanMessage } from '../shared/serviceBus';
 import { handleAnalyseMedia } from './handlers/handleMediaAnalysis';
 
-export async function letterbox(message: any) {
-  // ...existing code...
+export const letterbox: LetterboxHandler = async (message) => {
   if (!message) {
     logger.error('[analyse-media letterbox] Message is undefined or null');
     return { error: 'Message is undefined or null' };
@@ -24,4 +25,12 @@ export async function letterbox(message: any) {
       return analyseResult;
     }
   }
-}
+};
+
+letterbox.initializeQueue = async () => {
+  await QueueManager.startAnalyseMediaProcessing();
+};
+
+letterbox.shutdownQueue = async () => {
+  await QueueManager.stopAnalyseMediaProcessing();
+};

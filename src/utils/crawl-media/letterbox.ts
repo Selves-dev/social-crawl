@@ -1,10 +1,11 @@
+import type { LetterboxHandler } from '../shared/letterboxTypes';
 import { handleSearchCrawl } from "./handlers/handleSearchCrawl";
 import { handleMediaScrape } from "./handlers/handleMediaScrape";
 import { QueueManager } from "../shared/index";
 import { sendPostmanMessage } from "../shared/serviceBus";
 import { searchCrawlQueue, crawlMediaQueue } from "./throttleQueue";
 
-export async function letterbox(message: any) {
+export const letterbox: LetterboxHandler = async (message) => {
   // Log incoming message
   console.info('[letterbox] Incoming message:', JSON.stringify(message, null, 2));
   switch (message.type) {
@@ -34,7 +35,19 @@ export async function letterbox(message: any) {
       }
       // Start the queue if not running
       if (!searchCrawlQueue['isProcessing']) {
-        await searchCrawlQueue.startProcessing(handleSearchCrawl);
+        // Adapter: convert SearchCrawlJob to JobEnvelope<SearchCrawlContext>
+        const handler = async (job) => {
+          const envelope = {
+            type: job.type || 'search-crawl',
+            context: {
+              query: job.query || '',
+              platform: job.platform
+            },
+            workflow: job.workflow
+          };
+          return handleSearchCrawl(envelope);
+        };
+        await searchCrawlQueue.startProcessing(handler);
         console.info('[letterbox] searchCrawlQueue started');
         return { status: 'search-crawl-queue-started' };
       }
@@ -67,11 +80,18 @@ export async function letterbox(message: any) {
       }
       // Only stop the queue if all jobs are finished
       if (crawlMediaQueue['queue'].length === 0 && crawlMediaQueue['activeWorkers'] === 0) {
-        await QueueManager.stopMediaScrapeProcessing();
+        await QueueManager.stopCrawlMediaProcessing();
       }
       return { status: 'crawl-media-job-queued' };
     }
     default:
       return { error: 'Unknown message type', type: message.type };
   }
-}
+};
+letterbox.initializeQueue = async () => {
+  await searchCrawlQueue.initialize();
+};
+
+letterbox.shutdownQueue = async () => {
+  await QueueManager.stopSearchCrawlProcessing();
+};

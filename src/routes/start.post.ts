@@ -20,15 +20,7 @@ export default defineEventHandler(async (event) => {
       timestamp: new Date().toISOString(),
       messageSecurity
     };
-    // Optionally merge in extra properties from incoming workflow
-    if (body.workflow && typeof body.workflow === 'object') {
-      workflow = { ...workflow, ...body.workflow };
-    }
-    console.info('[start.post] Created workflow context:', workflow);
-    console.info('[start.post] batchId in workflow:', workflow?.batchId);
-    if (!body?.responseHandler || typeof body.responseHandler !== 'object') {
-      return sendError(event, createError({ statusCode: 400, statusMessage: 'Missing response handler' }))
-    }
+    // ...existing code...
 
     // Send a postman message with util and type at the top level for generic routing
     await sendPostmanMessage({

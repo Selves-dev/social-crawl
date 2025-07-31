@@ -1,3 +1,16 @@
+// --- Standardized result for all platform parsers ---
+export interface CrawlSearchResult {
+  id?: string;
+  link: string;
+  title: string;
+  snippet?: string;
+  username?: string;
+  caption?: string;
+  thumbnail?: string;
+  likeCount?: number | null;
+  viewCount?: number | null;
+  [key: string]: any; // For parser-specific fields
+}
 // --- YouTube parser types ---
 export interface YouTubeVideoData {
     video_url: string;

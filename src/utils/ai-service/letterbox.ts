@@ -1,3 +1,4 @@
+import type { LetterboxHandler } from '../shared/letterboxTypes';
 import { QueueManager } from '../index'
 /**
  * Ensures the AI service queue is started before enqueueing a request.
@@ -22,7 +23,7 @@ import { sendPostmanMessage } from '../shared/serviceBus'
 import { handleTextImageRequest, handleTextRequest } from './handlers/handleModelRequest'
 
 import { logger } from '../shared/logger'
-export async function letterbox(message: any) {
+export const letterbox: LetterboxHandler = async (message) => {
   logger.info('[letterbox] Routing by message.type', { type: message.type });
   logger.info('[letterbox] message.mediaUrl:', { mediaUrl: message.mediaUrl });
   logger.info('[letterbox] message.payload.mediaUrl:', { mediaUrl: message?.payload?.mediaUrl });

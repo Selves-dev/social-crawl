@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import { getBlobServiceClient } from '../../utils/shared/azureBlob';
 import { logger } from '../../shared/logger';
 import axios from 'axios';
-import { generateBlobSasUrl } from '../../utils/shared/azureBlob';
+import { generateBlobSasUrl } from '../../shared/azureBlob';
 
 export async function handleDownload(blobId: string, mediaUrl: string, blobServiceClient: any, containerName: string) {
   if (!blobServiceClient) {
@@ -14,10 +14,11 @@ export async function handleDownload(blobId: string, mediaUrl: string, blobServi
     throw new Error('Missing Azure Storage connection string');
   }
 
-  // Download video to tmp and upload to blob
+  // Download video to tmp
   const tmpVideoPath = path.join(os.tmpdir(), `${blobId}-video.mp4`);
-  const videoBlobName = `${blobId}-video.mp4`;
-  const videoBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(videoBlobName);
+  const tmpCompressedPath = path.join(os.tmpdir(), `${blobId}-video-compressed.mp4`);
+  const finalVideoBlobName = `${blobId}-video.mp4`;
+  const videoBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(finalVideoBlobName);
   logger.info('Spawning yt-dlp for video', { cmd: 'yt-dlp', args: ['-f', 'best', '-o', tmpVideoPath, mediaUrl] });
   await new Promise((resolve, reject) => {
     const video = spawn('yt-dlp', ['-f', 'best', '-o', tmpVideoPath, mediaUrl]);
@@ -42,14 +43,46 @@ export async function handleDownload(blobId: string, mediaUrl: string, blobServi
     logger.error(`Downloaded video file does not exist: ${tmpVideoPath}`);
     throw new Error('Downloaded video file does not exist');
   }
-  logger.info('Uploading video to blob', { tmpVideoPath, blobName: videoBlobName });
-  await videoBlob.uploadFile(tmpVideoPath);
-  logger.info('Streamed video to blob', { blobName: videoBlobName });
+  // Compress video with ffmpeg (240x426 portrait, 426x240 landscape, 400k bitrate)
+  // Default: portrait
+  let ffmpegArgs = ['-y', '-i', tmpVideoPath, '-vf', 'scale=240:426', '-b:v', '400k', '-c:v', 'libx264', '-preset', 'fast', tmpCompressedPath];
+  // Detect orientation by inspecting video dimensions (optional: can use platform info)
+  // For now, use portrait for TikTok/Instagram/Shorts, landscape for YouTube
+  if (/youtube\.com/.test(mediaUrl) && !/shorts/.test(mediaUrl)) {
+    ffmpegArgs = ['-y', '-i', tmpVideoPath, '-vf', 'scale=426:240', '-b:v', '400k', '-c:v', 'libx264', '-preset', 'fast', tmpCompressedPath];
+  }
+  logger.info('Spawning ffmpeg for video compression', { cmd: 'ffmpeg', args: ffmpegArgs });
+  await new Promise((resolve, reject) => {
+    const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+    ffmpeg.stdout.on('data', (data) => logger.info('ffmpeg compress stdout', { data: data.toString() }));
+    ffmpeg.stderr.on('data', (data) => logger.info('ffmpeg compress stderr', { data: data.toString() }));
+    ffmpeg.on('close', (code) => {
+      logger.info('ffmpeg compress process closed', { code });
+      if (code === 0) {
+        logger.info('Compressed video to tmp', { tmpCompressedPath });
+        resolve(true);
+      } else {
+        logger.error('ffmpeg video compression failed');
+        reject(new Error('ffmpeg video compression failed'));
+      }
+    });
+    ffmpeg.on('error', (err) => {
+      logger.error(err instanceof Error ? err.message : String(err));
+      reject(err);
+    });
+  });
+  if (!fs.existsSync(tmpCompressedPath)) {
+    logger.error(`Compressed video file does not exist: ${tmpCompressedPath}`);
+    throw new Error('Compressed video file does not exist');
+  }
+  logger.info('Uploading compressed video to blob', { tmpCompressedPath, blobName: finalVideoBlobName });
+  await videoBlob.uploadFile(tmpCompressedPath);
+  logger.info('Streamed compressed video to blob', { blobName: finalVideoBlobName });
 
 
   // Extract audio from downloaded MP4 using ffmpeg and upload to blob
-  const audioBlobName = `${blobId}-audio.mp3`;
-  const audioBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(audioBlobName);
+  const finalAudioBlobName = `${blobId}-audio.mp3`;
+  const audioBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(finalAudioBlobName);
   const tmpAudioPath = path.join(os.tmpdir(), `${blobId}-audio.mp3`);
   logger.info('Spawning ffmpeg to extract audio from video', {
     cmd: 'ffmpeg',
@@ -78,9 +111,9 @@ export async function handleDownload(blobId: string, mediaUrl: string, blobServi
     logger.error(`Extracted audio file does not exist: ${tmpAudioPath}`);
     throw new Error('Extracted audio file does not exist');
   }
-  logger.info('Uploading audio to blob', { tmpAudioPath, blobName: audioBlobName });
+  logger.info('Uploading audio to blob', { tmpAudioPath, blobName: finalAudioBlobName });
   await audioBlob.uploadFile(tmpAudioPath);
-  logger.info('Uploaded audio to blob', { blobName: audioBlobName });
+  logger.info('Uploaded audio to blob', { blobName: finalAudioBlobName });
 
   // Generate SAS tokens for video and audio blobs
   const videoSasUrl = await generateBlobSasUrl(videoBlob);
@@ -95,8 +128,8 @@ export async function handleDownloadThumbnail(blobId: string, thumbUrl: string, 
   if (!blobServiceClient) {
     throw new Error('Missing Azure Storage connection string');
   }
-  const thumbBlobName = `${blobId}-thumbnail.jpg`;
-  const thumbBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(thumbBlobName);
+  const finalThumbBlobName = thumbBlobName || `${blobId}-thumbnail.jpg`;
+  const thumbBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(finalThumbBlobName);
   const response = await axios.get(thumbUrl, { responseType: 'stream' });
   await thumbBlob.uploadStream(response.data);
   // Generate SAS token for thumbnail blob

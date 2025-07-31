@@ -4,6 +4,7 @@
  */
 
 import { MongoClient, Db, MongoClientOptions } from 'mongodb'
+import type { Document } from 'mongodb'
 import { logger } from './logger'
 import { Perspective } from './types'
 
@@ -131,7 +132,7 @@ class DatabaseManager {
    */
   getCollection<T = any>(name: string) {
     const db = this.getDatabase()
-    return db.collection<T>(name)
+    return db.collection<T extends Document ? T : Document>(name)
   }
 
   /**
@@ -183,5 +184,12 @@ export async function savePerspective(perspective: Perspective) {
 
 export async function getPerspective(_id: string): Promise<Perspective | null> {
   const collection = db.getCollection<Perspective>('perspectives');
-  return await collection.findOne({ _id });
+  // Ensure _id is an ObjectId for MongoDB queries
+  const { ObjectId } = await import('mongodb');
+  let objectId: any = _id;
+  // Only convert if _id is a string and valid ObjectId
+  if (typeof _id === 'string' && /^[a-fA-F0-9]{24}$/.test(_id)) {
+    objectId = new ObjectId(_id);
+  }
+  return await collection.findOne({ _id: objectId });
 }

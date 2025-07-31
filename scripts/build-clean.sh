@@ -129,6 +129,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Install build dependencies for sharp
+RUN apk add --no-cache --virtual .gyp python3 make g++ libc6-compat
+
 # Install pnpm
 RUN npm install -g pnpm
 
