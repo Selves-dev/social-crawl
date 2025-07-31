@@ -6,6 +6,7 @@ import { parseHtml as parseYoutubeHtml } from '../../shared/crawlSearch/youtubeP
 import type { MediaObject } from '../../shared/crawlSearch/types';
 import { MediaScrapeJob } from '../../shared/types';
 import { uploadJsonToBlob, getBlobName, getPlatform } from '../../shared/azureBlob';
+import type { BlobManifest } from '../../shared/types';
 import { logger } from '../../shared/logger';
 import { sendPostmanMessage } from '../../shared/serviceBus';
 
@@ -28,9 +29,9 @@ export async function handleMediaScrape(job: MediaScrapeJob) {
       query
     });
 
-    const mappedObject = await crawlSearch(job.link, platform);
+    const mappedObject = await crawlSearch(job.link, platform) as BlobManifest;
     if (!mappedObject) {
-      logger.error('[handleMediaScrape] No result from crawlSearch', { job, platform });
+      logger.error(`[handleMediaScrape] No result from crawlSearch: job=${JSON.stringify(job)}, platform=${platform}`);
       return;
     }
 
@@ -48,8 +49,10 @@ export async function handleMediaScrape(job: MediaScrapeJob) {
       logger.info('[handleMediaScrape] Routing blobUrl to post-office for prep-media', { blobUrl, workflow });
       await sendPostmanMessage({
         type: 'prep-media',
-        blobUrl,
-        workflow
+        context: workflow,
+        payload: {
+          blobUrl
+        }
       });
       logger.info('[handleMediaScrape] END - blobUrl routed to prep-media', { blobUrl });
     } catch (err) {

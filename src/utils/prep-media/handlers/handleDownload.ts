@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import { getBlobServiceClient } from '../../shared/azureBlob';
 import { logger } from '../../shared/logger';
 import axios from 'axios';
+import { generateBlobSasUrl } from '../../shared/azureBlob';
 
 export async function handleDownload(blobId: string, mediaUrl: string, blobServiceClient: any, containerName: string) {
   if (!blobServiceClient) {
@@ -80,9 +81,12 @@ export async function handleDownload(blobId: string, mediaUrl: string, blobServi
   await audioBlob.uploadFile(tmpAudioPath);
   logger.info('Uploaded audio to blob', { blobName: audioBlobName });
 
+  // Generate SAS tokens for video and audio blobs
+  const videoSasUrl = await generateBlobSasUrl(videoBlob);
+  const audioSasUrl = await generateBlobSasUrl(audioBlob);
   return {
-    video: videoBlob.url,
-    audio: audioBlob.url
+    video: videoSasUrl,
+    audio: audioSasUrl
   };
 }
 
@@ -94,5 +98,7 @@ export async function handleDownloadThumbnail(blobId: string, thumbUrl: string, 
   const thumbBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(thumbBlobName);
   const response = await axios.get(thumbUrl, { responseType: 'stream' });
   await thumbBlob.uploadStream(response.data);
-  return thumbBlob.url;
+  // Generate SAS token for thumbnail blob
+  const thumbSasUrl = await generateBlobSasUrl(thumbBlob);
+  return thumbSasUrl;
 }

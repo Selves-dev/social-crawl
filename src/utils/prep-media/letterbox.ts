@@ -1,0 +1,48 @@
+
+import { QueueManager } from '../index';
+import { handlePrepareMedia } from './handlers/handlePrepareMedia';
+import { logger } from '../shared/logger';
+import { sendPostmanMessage } from '../shared/serviceBus';
+
+/**
+ * Ensures the prep-media queue is started before enqueueing a request.
+ */
+export async function ensurePrepMediaQueueRunning() {
+  await QueueManager.startPrepMediaProcessing();
+}
+
+/**
+ * Attempts to stop the prep-media queue if it is empty, with a small delay to avoid rapid cycling.
+ * You should call this after processing a job.
+ */
+export async function shutdownPrepMediaQueueIfIdle(checkIsEmpty: () => Promise<boolean>, delayMs = 2000) {
+  setTimeout(async () => {
+    if (await checkIsEmpty()) {
+      await QueueManager.stopPrepMediaProcessing();
+    }
+  }, delayMs);
+}
+export async function letterbox(message: any) {
+  if (!message) {
+    logger.error('[prep-media letterbox] Message is undefined or null');
+    return { error: 'Message is undefined or null' };
+  }
+  if (!('type' in message)) {
+    logger.error('[prep-media letterbox] Message missing type property', { message });
+    return { error: 'Message missing type property', message };
+  }
+  if (!message.workflow) {
+    throw new Error('[prep-media letterbox] Missing workflow context in message');
+  }
+  switch (message.type) {
+    case 'prep-media-job': {
+      const prepResult = await handlePrepareMedia(message);
+      // Optionally route to next handler or send postman message here
+      // Example: sendPostmanMessage({ util: 'next-util', payload: { ... } });
+      return { status: 'prep-media-processed', prepResult };
+    }
+    default:
+      logger.warn(`[prep-media] Unknown message type: ${message.type}`, { message });
+      return { error: 'Unknown message type', type: message.type };
+  }
+}

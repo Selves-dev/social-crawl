@@ -1,5 +1,6 @@
 import { logger } from '../../shared/logger';
 import { getBlobJson, getBlobServiceClient, updateBlobJson } from '../../shared/azureBlob';
+import type { BlobManifest } from '../../shared/types';
 import axios from 'axios';
 import { spawn } from 'child_process';
 import { BlobServiceClient } from '@azure/storage-blob';
@@ -13,12 +14,12 @@ import { sendPostmanMessage, analyseMediaQueueName } from '../../shared/serviceB
 export async function handlePrepareMedia(message: any) {
   logger.info('handlePrepareMedia called', { message });
 
-  const { workflow, blobUrl, mediaUrl } = message;
+  const { workflow, blobUrl } = message;
 
   // 1. Fetch JSON object from blob
-  let blobJson;
+  let blobJson: BlobManifest;
   try {
-    blobJson = await getBlobJson(blobUrl);
+    blobJson = await getBlobJson(blobUrl) as BlobManifest;
     logger.info('Fetched blob JSON', { blobJson });
     // Ensure id is set from link if missing
     if (!blobJson.id && blobJson.link) {
@@ -39,7 +40,7 @@ export async function handlePrepareMedia(message: any) {
   }
 
   // Track media blob URLs
-  const media = {} as Record<string, string>;
+  const media: BlobManifest['media'] = [];
   const blobServiceClient = getBlobServiceClient();
   if (!blobServiceClient) {
     logger.error('Missing Azure Storage connection string');
@@ -51,10 +52,14 @@ export async function handlePrepareMedia(message: any) {
   // 2. Download video and audio, upload to blob
   let tmpVideoPath = path.join(os.tmpdir(), `${blobJson.id}-video.mp4`);
   try {
-    const downloadResults = await handleDownload(blobJson.id, mediaUrl, blobServiceClient, mediaContainerName);
-    media.video = downloadResults.video; // should be blob URL
-    media.audio = downloadResults.audio; // should be blob URL
-    logger.info('Downloaded and uploaded media', { video: media.video, audio: media.audio });
+    if (!blobJson.link) {
+      logger.error('No video link found in blobJson');
+      return;
+    }
+    const downloadResults = await handleDownload(blobJson.id, blobJson.link, blobServiceClient, mediaContainerName);
+    media.push({ type: 'video', url: downloadResults.video });
+    media.push({ type: 'audio', url: downloadResults.audio });
+    logger.info('Downloaded and uploaded media', { video: downloadResults.video, audio: downloadResults.audio });
   } catch (err) {
     logger.error('Failed to download and upload media', err instanceof Error ? err : new Error(String(err)));
     return;
@@ -66,7 +71,7 @@ export async function handlePrepareMedia(message: any) {
     logger.info('Calling handleStoryboard', { tmpVideoPath, blobId: blobJson.id });
     storyboardUrls = await handleStoryboard(tmpVideoPath, blobServiceClient, mediaContainerName, blobJson.id);
     logger.info('handleStoryboard returned', { storyboardUrls });
-    (media as { storyboards?: string[] }).storyboards = storyboardUrls;
+    media.push({ type: 'storyboards', url: storyboardUrls.join(',') });
   } catch (err) {
     logger.error('Failed to build/upload storyboard', err instanceof Error ? err : new Error(String(err)));
   }
@@ -75,8 +80,9 @@ export async function handlePrepareMedia(message: any) {
   try {
     const thumbUrl = blobJson.thumbnailUrl || message.thumbnailUrl;
     if (thumbUrl) {
-      media.thumbnail = await handleDownloadThumbnail(blobJson.id, thumbUrl, blobServiceClient, mediaContainerName);
-      logger.info('Streamed thumbnail to blob', { blobName: `${blobJson.id}-thumbnail.jpg`, thumbnail: media.thumbnail });
+      const thumbnailUrl = await handleDownloadThumbnail(blobJson.id, thumbUrl, blobServiceClient, mediaContainerName);
+      media.push({ type: 'thumbnail', url: thumbnailUrl });
+      logger.info('Streamed thumbnail to blob', { blobName: `${blobJson.id}-thumbnail.jpg`, thumbnail: thumbnailUrl });
     } else {
       logger.warn('No thumbnail URL provided');
     }
@@ -97,19 +103,21 @@ export async function handlePrepareMedia(message: any) {
     logger.info('Updated blob JSON with media URLs', { blobUrl });
     // Route to analyse-media
     if (workflow) {
-      await sendPostmanMessage({
+      const outgoingMessage = {
         util: 'analyse-media',
+        context: workflow,
         payload: {
-          workflow,
           blobUrl
         }
-      });
-      logger.info('Routed to analyse-media', { blobUrl, workflow });
+      };
+      logger.info('[handlePrepareMedia] Sending to postman', { outgoingMessage });
+      await sendPostmanMessage(outgoingMessage);
+      logger.info('[handlePrepareMedia] Routed to analyse-media', { blobUrl, context: workflow });
     } else {
       logger.warn('No workflow context for analyse-media routing');
     }
   } catch (err) {
     logger.error('Failed to update blob JSON with media URLs', err instanceof Error ? err : new Error(String(err)));
-    logger.error('Blob update error details', { blobUrl, media });
+    logger.error(`Blob update error details: blobUrl=${blobUrl}, media=${JSON.stringify(media)}`);
   }
 }

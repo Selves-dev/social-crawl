@@ -1,4 +1,4 @@
-import type { WorkflowContext } from '../../shared/workflowTracker'
+// import type { WorkflowContext } from '../../shared/workflowTracker'
 
 /**
  * Describes how the AI response should be delivered or handled downstream (e.g., by Postman)
@@ -22,12 +22,12 @@ export type ModelType = 'text' | 'text_image' | 'text_audio'
 export interface AIQueueMessage {
   modelType: ModelType
   prompt: string
-  /**
-   * URL to an Azure blob containing a JSON manifest of files (images, audio, etc.) to use with the prompt
-   */
+  
   blobUrl?: string
-  options?: Record<string, any> // Model options (temperature, maxTokens, etc.)
-  workflow: WorkflowContext
+  mediaUrl?: string
+
+  workflow: any
+  options?: Record<string, any>
   responseHandler: AIResponseHandler
   /**
    * Any additional metadata for tracing/debugging

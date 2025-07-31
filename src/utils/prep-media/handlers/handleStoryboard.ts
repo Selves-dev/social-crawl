@@ -6,37 +6,58 @@ import * as fs from 'fs';
 import { spawn } from 'child_process';
 import sharp from 'sharp';
 import { BlobServiceClient } from '@azure/storage-blob';
+import { generateBlobSasUrl } from '../../shared/azureBlob';
 
 export async function extractVideoSegments(tmpVideoPath: string, segmentDir: string): Promise<string[]> {
   logger.info('Creating segment directory', { segmentDir });
   fs.mkdirSync(segmentDir, { recursive: true });
-  logger.info('Spawning ffmpeg for segment extraction', { tmpVideoPath, segmentDir });
+  // Ensure blank image exists
+  const blankImagePath = path.resolve(process.cwd(), 'src/assets/blank.jpg');
+  if (!fs.existsSync(blankImagePath)) {
+    logger.info('Creating blank image', { blankImagePath });
+    // Use ffmpeg to create a blank white image 180x320
+    const { spawnSync } = require('child_process');
+    spawnSync('ffmpeg', ['-f', 'lavfi', '-i', 'color=c=white:s=180x320', '-frames:v', '1', blankImagePath]);
+  }
+  const ffmpegArgs = [
+    '-hide_banner', '-loglevel', 'error',
+    '-i', tmpVideoPath,
+    '-vf', 'fps=1/2',
+    path.join(segmentDir, 'frame_%03d.jpg')
+  ];
+  logger.info('Spawning ffmpeg for segment extraction', { tmpVideoPath, segmentDir, ffmpegArgs });
   await new Promise((resolve, reject) => {
-    const ffmpeg = spawn('ffmpeg', [
-      '-i', tmpVideoPath,
-      '-vf', 'fps=1/2,scale=720:1280',
-      path.join(segmentDir, 'segment-%02d.jpg')
-    ]);
-    ffmpeg.stdout.on('data', (data) => logger.info('ffmpeg stdout', { data: data.toString() }));
-    ffmpeg.stderr.on('data', (data) => logger.info('ffmpeg stderr', { data: data.toString() }));
+    const ffmpeg = spawn('ffmpeg', ffmpegArgs);
     ffmpeg.on('close', (code: number) => {
       logger.info('ffmpeg process closed', { code });
       if (code === 0) {
         logger.info('Extracted video segments', { segmentDir });
         resolve(true);
       } else {
-        logger.error('ffmpeg segment extraction failed');
-        reject(new Error('ffmpeg segment extraction failed'));
+      logger.error('ffmpeg segment extraction failed');
+      logger.info('ffmpeg context', { tmpVideoPath, segmentDir, ffmpegArgs });
+      reject(new Error('ffmpeg segment extraction failed'));
       }
     });
     ffmpeg.on('error', (err) => {
-      logger.error(err instanceof Error ? err.message : String(err));
+      logger.error('ffmpeg process error: ' + (err instanceof Error ? err.message : String(err)));
+      logger.info('ffmpeg context', { tmpVideoPath, segmentDir, ffmpegArgs });
       reject(err);
     });
   });
-  const files = fs.readdirSync(segmentDir)
-    .filter(f => f.endsWith('.jpg'))
+  // Get sorted frame files numerically
+  let files = fs.readdirSync(segmentDir)
+    .filter(f => /^frame_\d+\.jpg$/.test(f))
+    .sort((a, b) => {
+      // Sort by frame number
+      const numA = parseInt(a.match(/(\d+)/)?.[0] || '0', 10);
+      const numB = parseInt(b.match(/(\d+)/)?.[0] || '0', 10);
+      return numA - numB;
+    })
     .map(f => path.join(segmentDir, f));
+  if (files.length === 0) {
+    logger.warn('No frames extracted from video', { tmpVideoPath, segmentDir, ffmpegArgs });
+  }
   logger.info('Segment files found', { files });
   return files;
 }
@@ -49,35 +70,55 @@ export async function handleStoryboard(tmpVideoPath: string, blobServiceClient: 
   const segmentPaths = await extractVideoSegments(tmpVideoPath, segmentDir);
   logger.info('handleStoryboard: segmentPaths', { segmentPaths });
   const gridSize = 4;
+  const thumbWidth = 180;
+  const thumbHeight = 320;
+  const blankImagePath = path.resolve(process.cwd(), 'src/assets/blank.jpg');
   const storyboardUrls: string[] = [];
   for (let i = 0; i < segmentPaths.length; i += gridSize * gridSize) {
+    // Get up to gridSize*gridSize images for this grid
     const gridImages = segmentPaths.slice(i, i + gridSize * gridSize);
-    logger.info('Grid images for storyboard', { gridImages });
-    // Use ESM-compatible path for blank.jpg
-    const blankImagePath = path.resolve(process.cwd(), 'src/assets/blank.jpg');
+    // Pad with blank frames if needed
     while (gridImages.length < gridSize * gridSize) {
       gridImages.push(blankImagePath);
     }
     logger.info('Final grid images (with blanks)', { gridImages });
-    const imageBuffers = await Promise.all(gridImages.map(img => fs.promises.readFile(img)));
-    logger.info('Loaded image buffers for grid', { count: imageBuffers.length });
-    const composite: any[] = [];
-    for (let y = 0; y < gridSize; y++) {
-      for (let x = 0; x < gridSize; x++) {
-        composite.push({ input: imageBuffers[y * gridSize + x], top: y * 320, left: x * 180 });
-      }
+    // Ensure all images are 180x320
+    const resizedBuffers: Buffer[] = [];
+    for (const imgPath of gridImages) {
+      const buf = await fs.promises.readFile(imgPath);
+      const resized = await sharp(buf).resize(180, 320).toBuffer();
+      resizedBuffers.push(resized);
     }
-    const storyboardBuffer = await sharp({ create: { width: 180 * gridSize, height: 320 * gridSize, channels: 3, background: '#fff' } })
+    // Prepare composite array for sharp
+    const composite: any[] = [];
+    for (let idx = 0; idx < resizedBuffers.length; idx++) {
+      const x = idx % gridSize;
+      const y = Math.floor(idx / gridSize);
+      composite.push({ input: resizedBuffers[idx], top: y * thumbHeight, left: x * thumbWidth });
+    }
+    // Create the grid image
+    const storyboardBuffer = await sharp({
+      create: {
+        width: thumbWidth * gridSize,
+        height: thumbHeight * gridSize,
+        channels: 3,
+        background: '#fff',
+      },
+    })
       .composite(composite)
       .jpeg()
       .toBuffer();
-    const storyboardPath = path.join(os.tmpdir(), `${blobId}-storyboard-${i / (gridSize * gridSize)}.jpg`);
+    // Save to temp file
+    const gridIdx = Math.floor(i / (gridSize * gridSize));
+    const storyboardPath = path.join(os.tmpdir(), `${blobId}-storyboard-${gridIdx}.jpg`);
     fs.writeFileSync(storyboardPath, storyboardBuffer);
-    const storyboardBlobName = `${blobId}-storyboard-${i / (gridSize * gridSize)}.jpg`;
+    // Upload to blob
+    const storyboardBlobName = `${blobId}-storyboard-${gridIdx}.jpg`;
     const storyboardBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(storyboardBlobName);
     await storyboardBlob.uploadFile(storyboardPath);
     logger.info('Uploaded storyboard to blob', { blobName: storyboardBlobName });
-    storyboardUrls.push(storyboardBlob.url);
+    const storyboardSasUrl = await generateBlobSasUrl(storyboardBlob);
+    storyboardUrls.push(storyboardSasUrl);
   }
   return storyboardUrls;
 }

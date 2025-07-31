@@ -1,3 +1,23 @@
+/**
+ * Central type for blob manifest JSON structure
+ */
+export interface BlobManifest {
+  id?: string;
+  link?: string;
+  media?: Array<{
+    type?: string;
+    url?: string;
+    [key: string]: any;
+  }>;
+  [key: string]: any;
+}
+  media?: Array<{
+    type?: string
+    url?: string
+    [key: string]: any
+  }>
+  [key: string]: any
+}
 import { BlobServiceClient } from '@azure/storage-blob';
 
 /**

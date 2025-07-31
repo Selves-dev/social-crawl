@@ -1,3 +1,25 @@
+import { BlobSASPermissions, generateBlobSASQueryParameters, SASProtocol, StorageSharedKeyCredential } from '@azure/storage-blob';
+
+export async function generateBlobSasUrl(blobClient: any, expiryMinutes = 60): Promise<string> {
+  const urlParts = blobClient.url.match(/https:\/\/(.*?)\.blob\.core\.windows\.net\/(.*?)\/(.*)/);
+  if (!urlParts) throw new Error('Invalid blob URL');
+  const accountName = urlParts[1];
+  const containerName = urlParts[2];
+  const blobName = urlParts[3];
+  // You may need to get the account key from your blobServiceClient
+  const accountKey = blobClient.credential?.accountKey || blobClient?.accountKey;
+  if (!accountKey) throw new Error('Missing Azure Storage account key for SAS generation');
+  const sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
+  const expiresOn = new Date(Date.now() + expiryMinutes * 60 * 1000);
+  const sasParams = generateBlobSASQueryParameters({
+    containerName,
+    blobName,
+    permissions: BlobSASPermissions.parse('r'),
+    expiresOn,
+    protocol: SASProtocol.Https,
+  }, sharedKeyCredential);
+  return `${blobClient.url}?${sasParams.toString()}`;
+}
 import { BlobServiceClient } from '@azure/storage-blob';
 
 export function getBlobName({ platform, type = 'json', id }: { platform: string; type?: string; id: string }): string {

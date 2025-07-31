@@ -19,39 +19,47 @@ export async function shutdownAIServiceQueueIfIdle(checkIsEmpty: () => Promise<b
 }
 
 import { sendPostmanMessage } from '../shared/serviceBus'
-import { handleModelRequest } from './handlers/handleModelRequest'
-
+import { handleTextImageRequest, handleTextRequest } from './handlers/handleModelRequest'
 
 import { logger } from '../shared/logger'
 export async function letterbox(message: any) {
+  logger.info('[letterbox] Routing by message.type', { type: message.type });
+  logger.info('[letterbox] message.mediaUrl:', { mediaUrl: message.mediaUrl });
+  logger.info('[letterbox] message.payload.mediaUrl:', { mediaUrl: message?.payload?.mediaUrl });
   if (!message.workflow) {
+    logger.error('[ai-service letterbox] Missing workflow context in message');
     throw new Error('[ai-service letterbox] Missing workflow context in message');
   }
-  const workflowContext = message.workflow;
+  let aiResult;
   switch (message.type) {
-    case 'ai_request': {
-
-      const aiResult = await handleModelRequest(message, workflowContext);
-      if (message.responseHandler && message.responseHandler.util && message.responseHandler.type) {
-        await sendPostmanMessage({
-          util: message.responseHandler.util,
-          payload: {
-            type: message.responseHandler.type,
-            workflow: workflowContext,
-            ...aiResult
-          }
-        });
-        logger.info('[AI-Service] Sent AI response to response handler', {
-          to: message.responseHandler,
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        logger.warn('[AI-Service] No valid responseHandler specified in ai_request', { message, context });
-      }
-      return { status: 'ai-request-processed', aiResult };
-    }
+    case 'text':
+      message.modelType = 'text';
+      aiResult = await handleTextRequest(message);
+      break;
+    case 'text-image':
+      message.modelType = 'text-image';
+      aiResult = await handleTextImageRequest(message);
+      break;
+    case 'text-audio':
+      message.modelType = 'text-audio';
+      aiResult = await handleTextRequest(message);
+      break;
     default:
-      logger.warn(`[AI-Service] Unknown message type: ${message.type}`, { message, context });
-      return { error: 'Unknown message type', type: message.type };
+      aiResult = await handleTextRequest(message);
+      break;
   }
+
+  if (message.responseHandler && message.responseHandler.util && message.responseHandler.type) {
+    await sendPostmanMessage({
+      util: message.responseHandler.util,
+      context: message.workflow,
+      payload: {
+        type: message.responseHandler.type,
+        ...aiResult
+      }
+    });
+  } else {
+    logger.warn('[AI-Service] No valid responseHandler specified in ai_request', { message, workflow: message.workflow });
+  }
+  return { status: 'ai-request-processed', aiResult };
 }
