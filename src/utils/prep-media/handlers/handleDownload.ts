@@ -3,7 +3,7 @@ import { spawn } from 'child_process';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
-import { getBlobServiceClient } from '../../utils/shared/azureBlob';
+import { getBlobServiceClient } from '../../shared/azureBlob';
 import { logger } from '../../shared/logger';
 import axios from 'axios';
 import { generateBlobSasUrl } from '../../shared/azureBlob';
@@ -128,7 +128,7 @@ export async function handleDownloadThumbnail(blobId: string, thumbUrl: string, 
   if (!blobServiceClient) {
     throw new Error('Missing Azure Storage connection string');
   }
-  const finalThumbBlobName = thumbBlobName || `${blobId}-thumbnail.jpg`;
+  const finalThumbBlobName = `${blobId}-thumbnail.jpg`;
   const thumbBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(finalThumbBlobName);
   const response = await axios.get(thumbUrl, { responseType: 'stream' });
   await thumbBlob.uploadStream(response.data);
