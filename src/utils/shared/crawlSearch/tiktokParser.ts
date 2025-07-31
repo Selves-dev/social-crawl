@@ -79,8 +79,16 @@ function mapTikTokVideoData(videoData: TikTokVideoData): CrawlSearchResult | nul
       if (stickerTexts) caption = stickerTexts;
     }
 
+    // Extract date (TikTok uses createTime as a Unix timestamp in seconds)
+    let date = '';
+    if (videoData.createTime) {
+      // Format as YYYY-MM-DD (no time)
+      const d = new Date(videoData.createTime * 1000);
+      date = d.toISOString().slice(0, 10);
+    }
+
     const result: CrawlSearchResult = {
-      id: video_id,
+      mediaId: video_id,
       link,
       username: videoData.author?.uniqueId || videoData.author?.nickname || '',
       title: '', // TikTok doesn't typically have separate titles from descriptions
@@ -88,15 +96,18 @@ function mapTikTokVideoData(videoData: TikTokVideoData): CrawlSearchResult | nul
       viewCount: videoData.stats?.playCount || undefined,
       likeCount: videoData.stats?.diggCount || undefined,
       thumbnail: videoData.video?.cover || '',
+      date,
     };
 
     console.log('TikTok parser: Successfully mapped video:', {
+      mediaId: result.mediaId,
       username: result.username,
       views: result.viewCount,
       likes: result.likeCount,
       link: result.link,
       caption: result.caption,
-      thumbnail: result.thumbnail
+      thumbnail: result.thumbnail,
+      date: result.date
     });
 
     return result;

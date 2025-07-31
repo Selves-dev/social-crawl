@@ -62,8 +62,18 @@ export function parseHtml(htmlContent: string): CrawlSearchResult[] {
         }
       }
     }
+    // Extract publish date from ytInitialPlayerResponse if available
+    let date = '';
+    const microformat = (ytInitialPlayerResponse && (ytInitialPlayerResponse as any).microformat) || undefined;
+    if (microformat?.playerMicroformatRenderer?.publishDate) {
+      // publishDate is usually in 'YYYY-MM-DD' format
+      const publishDate = microformat.playerMicroformatRenderer.publishDate;
+      // Format as YYYY-MM-DD (no time)
+      date = new Date(publishDate).toISOString().slice(0, 10);
+    }
+
     const result = {
-      id,
+      mediaId: id,
       link: video_url,
       username: author,
       title,
@@ -71,8 +81,21 @@ export function parseHtml(htmlContent: string): CrawlSearchResult[] {
       viewCount: view_count ? Number(view_count) : undefined,
       likeCount: like_count ? Number(like_count) : undefined,
       thumbnail: thumbnail_url,
+      date,
     };
     console.log('YouTube parser: Parsed video result:', result);
+    // Print each field for clarity
+    console.log('YouTube parser: Mapped fields:', {
+      mediaId: result.mediaId,
+      link: result.link,
+      username: result.username,
+      title: result.title,
+      caption: result.caption,
+      viewCount: result.viewCount,
+      likeCount: result.likeCount,
+      thumbnail: result.thumbnail,
+      date: result.date
+    });
     return [result];
   } catch (error) {
     console.error('YouTube parser: Error parsing HTML:', (error as Error).message);

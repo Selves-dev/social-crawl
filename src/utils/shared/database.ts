@@ -165,8 +165,20 @@ export { Db, Collection, MongoClient } from 'mongodb'
 
 export async function savePerspective(perspective: Perspective) {
   const collection = db.getCollection<Perspective>('perspectives');
-  await collection.replaceOne({ _id: perspective._id }, perspective, { upsert: true });
-  logger.info('Saved perspective to DB', { _id: perspective._id });
+  
+  // Use mediaId as the unique identifier for upsert operations
+  // This way MongoDB will generate _id automatically for new documents
+  const result = await collection.replaceOne(
+    { mediaId: perspective.mediaId }, 
+    perspective, 
+    { upsert: true }
+  );
+  
+  logger.info('Saved perspective to DB', { 
+    mediaId: perspective.mediaId,
+    upserted: result.upsertedId,
+    modified: result.modifiedCount 
+  });
 }
 
 export async function getPerspective(_id: string): Promise<Perspective | null> {

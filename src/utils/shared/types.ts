@@ -60,7 +60,6 @@ export type BlobManifest = {
 };
 
 export interface Perspective {
-  _id: string;
   mediaId: string;
   source: string;
   permalink: string;
@@ -68,7 +67,6 @@ export interface Perspective {
   createdAt: string;
   updatedAt: string;
   date: string;
-  mediaType: string;
   adminTitle: string;
   slug: string;
   caption: string;
@@ -76,7 +74,9 @@ export interface Perspective {
   audioDescription: string[];
   places: Array<{ name: string; confidence: number }>;
   locations: Array<{ name: string; confidence: number }>;
-  l: string;
-  cc: string;
-  w: string;
+  context: {
+    l: string;
+    cc: string;
+    w: string;
+  };
 }
