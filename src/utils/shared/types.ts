@@ -58,3 +58,25 @@ export type BlobManifest = {
   url?: string;
   [key: string]: any;
 };
+
+export interface Perspective {
+  _id: string;
+  mediaId: string;
+  source: string;
+  permalink: string;
+  username: string;
+  createdAt: string;
+  updatedAt: string;
+  date: string;
+  mediaType: string;
+  adminTitle: string;
+  slug: string;
+  caption: string;
+  mediaDescription: string[];
+  audioDescription: string[];
+  places: Array<{ name: string; confidence: number }>;
+  locations: Array<{ name: string; confidence: number }>;
+  l: string;
+  cc: string;
+  w: string;
+}

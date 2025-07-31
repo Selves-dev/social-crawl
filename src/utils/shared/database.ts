@@ -5,6 +5,7 @@
 
 import { MongoClient, Db, MongoClientOptions } from 'mongodb'
 import { logger } from './logger'
+import { Perspective } from './types'
 
 export interface DatabaseConfig {
   uri: string
@@ -161,3 +162,14 @@ export const db = new DatabaseManager()
 
 // Export types
 export { Db, Collection, MongoClient } from 'mongodb'
+
+export async function savePerspective(perspective: Perspective) {
+  const collection = db.getCollection<Perspective>('perspectives');
+  await collection.replaceOne({ _id: perspective._id }, perspective, { upsert: true });
+  logger.info('Saved perspective to DB', { _id: perspective._id });
+}
+
+export async function getPerspective(_id: string): Promise<Perspective | null> {
+  const collection = db.getCollection<Perspective>('perspectives');
+  return await collection.findOne({ _id });
+}
