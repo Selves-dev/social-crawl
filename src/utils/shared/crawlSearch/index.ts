@@ -3,7 +3,7 @@ import fetch from 'node-fetch';
 import { parseHtml as parseGoogleHtml } from './googleParser';
 import { parseHtml as parseTiktokHtml } from './tiktokParser';
 import { parseHtml as parseYoutubeHtml } from './youtubeParser';
-// import { parseHtml as parseInstagramHtml } from './instagramParser';
+import { parseHtml as parseInstagramHtml } from './instagramParser';
 
 import type { CrawlSearchResult } from './types';
 
@@ -44,13 +44,11 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
       }
       return result;
     } else if (platform === 'instagram') {
-      // Uncomment to use static import:
-      // const [result] = parseInstagramHtml(html);
-      // if (!result) {
-      //   console.warn(`[crawlSearch] Instagram parser returned no result for url: ${input}`);
-      // }
-      // return result;
-      return { link: input }; // fallback
+      [result] = parseInstagramHtml(html);
+      if (!result) {
+        console.warn(`[crawlSearch] Instagram parser returned no result for url: ${input}`);
+      }
+      return result;
     } else {
       console.warn(`[crawlSearch] Unknown platform or no parser for platform: ${platform}, url: ${input}`);
       return { link: input };

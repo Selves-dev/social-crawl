@@ -99,16 +99,7 @@ function mapTikTokVideoData(videoData: TikTokVideoData): CrawlSearchResult | nul
       date,
     };
 
-    console.log('TikTok parser: Successfully mapped video:', {
-      mediaId: result.mediaId,
-      username: result.username,
-      views: result.viewCount,
-      likes: result.likeCount,
-      link: result.link,
-      caption: result.caption,
-      thumbnail: result.thumbnail,
-      date: result.date
-    });
+    console.log('TikTok parser: Successfully mapped video:', result);
 
     return result;
 
