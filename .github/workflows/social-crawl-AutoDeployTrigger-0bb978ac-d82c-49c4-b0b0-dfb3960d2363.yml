@@ -1,0 +1,49 @@
+name: Trigger auto deployment for social-crawl
+
+# When this action will be executed
+on:
+  # Automatically trigger it when detected changes in repo
+  push:
+    branches: 
+      [ main ]
+    paths:
+    - '**'
+    - '.github/workflows/social-crawl-AutoDeployTrigger-0bb978ac-d82c-49c4-b0b0-dfb3960d2363.yml'
+
+  # Allow manual trigger 
+  workflow_dispatch:      
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions: 
+      id-token: write #This is required for requesting the OIDC JWT Token
+      contents: read #Required when GH token is used to authenticate with private repo
+
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.SOCIALCRAWL_AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.SOCIALCRAWL_AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.SOCIALCRAWL_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push container image to registry
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          appSourcePath: ${{ github.workspace }}
+          _dockerfilePathKey_: _dockerfilePath_
+          _targetLabelKey_: _targetLabel_
+          registryUrl: socialcrawlcr.azurecr.io
+          registryUsername: ${{ secrets.SOCIALCRAWL_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.SOCIALCRAWL_REGISTRY_PASSWORD }}
+          containerAppName: social-crawl
+          resourceGroup: social-crawl-rg
+          imageToBuild: socialcrawlcr.azurecr.io/social-crawl:${{ github.sha }}
+          _buildArgumentsKey_: |
+            _buildArgumentsValues_
+
+
