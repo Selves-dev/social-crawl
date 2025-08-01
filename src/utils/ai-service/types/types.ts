@@ -1,22 +1,13 @@
 // import type { WorkflowContext } from '../../shared/workflowTracker'
 
-/**
- * Describes how the AI response should be delivered or handled downstream (e.g., by Postman)
- */
 export interface AIResponseHandler {
-  /**
-   * The type of handler (e.g., 'postman', 'webhook', etc.)
-   */
+ 
   type: string
-  /**
-   * Handler-specific configuration (e.g., callback URL, postman queue name, etc.)
-   */
+
   config: Record<string, any>
 }
 
-/**
- * Generic AI queue message for model-agnostic processing
- */
+
 export type ModelType = 'text' | 'text_image' | 'text_audio'
 
 export interface AIQueueMessage {
@@ -29,17 +20,9 @@ export interface AIQueueMessage {
   workflow: any
   options?: Record<string, any>
   responseHandler: AIResponseHandler
-  /**
-   * Any additional metadata for tracing/debugging
-   */
+
   meta?: Record<string, any>
 }
-/**
- * AI Service Types
- * AI Service Types for text and multimodal models
- */
-
-// ...Gemma model types removed...
 
 interface AIServiceConfig {
   timeout: number // Request timeout in milliseconds

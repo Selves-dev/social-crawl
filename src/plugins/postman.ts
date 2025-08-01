@@ -1,6 +1,7 @@
 import { defineNitroPlugin } from 'nitropack/runtime'
-import { logger, serviceBus, getServiceBusConfigFromEnv, QueueManager } from '../utils/shared'
+import { logger, serviceBus, getServiceBusConfigFromEnv } from '../utils/shared'
 import { postmanProcessor } from '../utils/shared/postman/processor'
+import { QueueManager } from '../utils/shared/index'
 
 export default defineNitroPlugin(async (nitroApp) => {
   logger.info('🚀 Starting postman plugin...', { service: 'postman' })

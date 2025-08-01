@@ -5,7 +5,7 @@ import { QueueManager } from "../shared/index";
 import { sendPostmanMessage } from "../shared/serviceBus";
 import { searchCrawlQueue, crawlMediaQueue } from "./throttleQueue";
 
-export const letterbox: LetterboxHandler = async (message) => {
+export const crawlMediaLetterbox: LetterboxHandler = async (message) => {
   // Log incoming message
   console.info('[letterbox] Incoming message:', JSON.stringify(message, null, 2));
   switch (message.type) {
@@ -88,10 +88,10 @@ export const letterbox: LetterboxHandler = async (message) => {
       return { error: 'Unknown message type', type: message.type };
   }
 };
-letterbox.initializeQueue = async () => {
+crawlMediaLetterbox.initializeQueue = async () => {
   await searchCrawlQueue.initialize();
 };
 
-letterbox.shutdownQueue = async () => {
+crawlMediaLetterbox.shutdownQueue = async () => {
   await QueueManager.stopSearchCrawlProcessing();
 };

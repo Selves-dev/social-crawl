@@ -9,19 +9,7 @@ import { getSecurityManager } from '../shared/security'
 import { ServiceBusReceiver, ServiceBusSender, ServiceBusReceivedMessage } from '@azure/service-bus'
 import { handlePrepareMedia } from './handlers/handlePrepareMedia'
 
-export interface PrepMediaJob {
-  id: string
-  mediaUrl: string
-  type: 'image' | 'video'
-  metadata?: Record<string, any>
-  timestamp: string
-  media?: {
-    video?: string;
-    audio?: string;
-    thumbnail?: string;
-    storyboards?: string[];
-  }
-}
+import type { PrepMediaJob } from '../shared/types'
 
 export class PrepMediaThrottleQueue {
   private receiver: ServiceBusReceiver | null = null
@@ -31,8 +19,8 @@ export class PrepMediaThrottleQueue {
   private readonly maxConcurrentJobs: number
 
   constructor() {
-    this.queueName = process.env["ASB-PREP-MEDIA-QUEUE"] || 'prep-media'
-    this.maxConcurrentJobs = parseInt(process.env["PREP-MEDIA-MAX-CONCURRENT-JOBS"] || '3', 10)
+    this.queueName = process.env["ASB-PREP-MEDIA-QUEUE"] || 'prep-media';
+    this.maxConcurrentJobs = parseInt(process.env["PREP-MEDIA-MAX-CONCURRENT-JOBS"] || '2', 10);
   }
 
   async initialize(): Promise<void> {

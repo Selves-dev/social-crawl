@@ -1,17 +1,23 @@
+// Venue type for AI venue extraction and MongoDB
+export interface Venue {
+  name: string;
+  location: {
+    address: string;
+    postcode: string;
+    [key: string]: any;
+  };
+  rooms: Array<{
+    name: string;
+    [key: string]: any;
+  }>;
+  [key: string]: any;
+}
 // Generic job envelope type for all queues
 export type JobEnvelope<T = any> = {
   type: string;
   context: T;
   workflow: import('./workflow').WorkflowContext;
 };
-
-export type SearchCrawlContext = {
-  query: string;
-  platform: string;
-  location?: string;
-  countryCode?: string;
-};
-// Shared job types for all queues
 
 export type SearchCrawlJob = {
   link?: string;
@@ -32,7 +38,10 @@ export type MediaScrapeJob = {
 
 export type PrepMediaJob = {
   id: string;
-  link: string;
+  // Original field from throttleQueue.ts
+  mediaUrl?: string;
+  // Original field from types.ts
+  link?: string;
   username?: string;
   title?: string;
   caption?: string;
@@ -40,6 +49,16 @@ export type PrepMediaJob = {
   likeCount?: number;
   thumbnail?: string;
   workflow?: any;
+  // From throttleQueue.ts
+  type?: 'image' | 'video';
+  metadata?: Record<string, any>;
+  timestamp?: string;
+  media?: {
+    video?: string;
+    audio?: string;
+    thumbnail?: string;
+    storyboards?: string[];
+  };
 };
 
 export type AIServiceJob = {

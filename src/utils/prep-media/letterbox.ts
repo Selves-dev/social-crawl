@@ -1,6 +1,6 @@
 import type { LetterboxHandler } from '../shared/letterboxTypes';
 
-import { QueueManager } from '../index';
+import { QueueManager } from '../shared/index';
 import { handlePrepareMedia } from './handlers/handlePrepareMedia';
 import { logger } from '../shared/logger';
 import { sendPostmanMessage } from '../shared/serviceBus';
@@ -23,7 +23,7 @@ export async function shutdownPrepMediaQueueIfIdle(checkIsEmpty: () => Promise<b
     }
   }, delayMs);
 }
-export const letterbox: LetterboxHandler = async (message) => {
+export const prepMediaLetterbox: LetterboxHandler = async (message) => {
   if (!message) {
     logger.error('[prep-media letterbox] Message is undefined or null');
     return { error: 'Message is undefined or null' };
@@ -37,10 +37,10 @@ export const letterbox: LetterboxHandler = async (message) => {
   // Example: sendPostmanMessage({ util: 'next-util', payload: { ... } });
   return { status: 'prep-media-processed', prepResult };
 }
-letterbox.initializeQueue = async () => {
+prepMediaLetterbox.initializeQueue = async () => {
   await QueueManager.startPrepMediaProcessing();
 };
 
-letterbox.shutdownQueue = async () => {
+prepMediaLetterbox.shutdownQueue = async () => {
   await QueueManager.stopPrepMediaProcessing();
 };

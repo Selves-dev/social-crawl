@@ -1,7 +1,7 @@
 import type { CrawlSearchResult, TikTokVideoData } from './types';
 
 // --- MAIN PARSER FUNCTION ---
-export function parseHtml(htmlContent: string): CrawlSearchResult[] {
+export function parseTikTokHtml(htmlContent: string): CrawlSearchResult[] {
   console.log('TikTok parser: Processing HTML content...');
   
   if (!htmlContent || typeof htmlContent !== 'string') {
@@ -124,4 +124,4 @@ export function validateTikTokResponse(htmlContent: string): boolean {
 
 
 // --- MAIN EXPORT ---
-export default parseHtml;
+export default parseTikTokHtml;

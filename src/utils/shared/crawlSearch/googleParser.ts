@@ -2,7 +2,7 @@ import type { CrawlSearchResult } from './types';
 
 // Accepts either raw JSON data or a string and returns a unique list of social URLs.
 // Optionally includes the original search URL as the first result.
-export function parseHtml(data: any, searchUrl?: string): CrawlSearchResult[] {
+export function parseGoogleHtml(data: any, searchUrl?: string): CrawlSearchResult[] {
   // Accepts only raw HTML string
   if (typeof data !== 'string') {
     console.error('Google parser expects a raw HTML string as input.');

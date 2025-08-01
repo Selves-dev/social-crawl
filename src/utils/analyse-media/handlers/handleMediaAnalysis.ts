@@ -1,5 +1,5 @@
 import { logger } from '../../shared/logger';
-import { buildAnalysisPrompt } from '../handlers/buildAnalysisPrompt';
+import { buildAnalysisPrompt } from '../handlers/buildAnalysisPrompts';
 import { sendPostmanMessage } from '../../shared/serviceBus';
 import { getBlobJson } from '../../shared/azureBlob';
 

@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio';
 
 
 // --- MAIN PARSER FUNCTION ---
-export function parseHtml(htmlContent: string): CrawlSearchResult[] {
+export function parseYouTubeHtml(htmlContent: string): CrawlSearchResult[] {
   try {
     const $ = cheerio.load(htmlContent);
     // Extract JSON data from scripts
@@ -161,7 +161,7 @@ function extractLikeCount(ytInitialData: YouTubeInitialData | null): string {
 }
 
 // --- MAIN EXPORT ---
-export default parseHtml;
+export default parseYouTubeHtml;
 
 // Utility function for debugging/testing
 export function printVideoInfo(data: YouTubeVideoData | null): void {

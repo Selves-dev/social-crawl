@@ -1,4 +1,34 @@
 /**
+ * Retrieve a venue by address and postcode
+ */
+export async function getVenue(name: string, address: string, postcode: string): Promise<Venue | null> {
+  const collection = db.getCollection<Venue>('venues');
+  return await collection.findOne({
+    name,
+    'location.address': address,
+    'location.postcode': postcode
+  });
+}
+import type { Venue } from './types';
+export async function saveVenue(venue: Venue) {
+  const collection = db.getCollection<Venue>('venues');
+  // Use name+address+postcode as unique identifier for upsert
+  const filter = {
+    name: venue.name,
+    'location.address': venue.location.address,
+    'location.postcode': venue.location.postcode
+  };
+  const result = await collection.replaceOne(filter, venue, { upsert: true });
+  logger.info('Saved venue to DB', {
+    name: venue.name,
+    address: venue.location.address,
+    postcode: venue.location.postcode,
+    upserted: result.upsertedId,
+    modified: result.modifiedCount
+  });
+  return result;
+}
+/**
  * MongoDB Atlas Database Connection
  * Handles database connections with connection pooling
  */

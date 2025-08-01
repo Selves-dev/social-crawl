@@ -1,7 +1,7 @@
 import ffmpeg from 'fluent-ffmpeg';
 import { Readable } from 'stream';
 import { Buffer } from 'buffer';
-import fetch from 'node-fetch'
+import axios from 'axios'
 import { logger } from '../../shared/logger'
 import { getBlobJson } from '../../shared/azureBlob'
 import type { BlobManifest } from '../../shared/types'
@@ -40,13 +40,12 @@ async function buildMessageContent(prompt: string, mediaUrl?: string): Promise<a
   }
   async function fetchAndEncodeAudio(url: string): Promise<string | null> {
     try {
-      const res = await fetch(url);
-      if (!res.ok) {
+      const res = await axios.get(url, { responseType: 'arraybuffer' });
+      if (res.status !== 200) {
         logger.warn(`[fetchAndEncodeAudio] Failed to fetch audio, skipping: ${url}`);
         return null;
       }
-      const arrayBuffer = await res.arrayBuffer();
-      const originalBuffer = Buffer.from(arrayBuffer);
+      const originalBuffer = Buffer.from(res.data);
       // Compress audio before encoding
       const compressedBuffer = await compressAudio(originalBuffer);
       const base64 = compressedBuffer.toString('base64');
@@ -126,16 +125,13 @@ async function fetchOpenAIResponse(
     max_tokens: options.maxTokens || 4096
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
+  const response = await axios.post(url, body, {
     headers: {
       'Content-Type': 'application/json',
       'api-key': apiKey
-    },
-    body: JSON.stringify(body)
-  })
-
-  const data = await response.json() as any
+    }
+  });
+  const data = response.data as any;
   const text = data.choices?.[0]?.message?.content || ''
 
   return {

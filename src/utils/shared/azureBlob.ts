@@ -62,19 +62,7 @@ export async function generateBlobSasUrl(blobClient: any, expiryMinutes = 60): P
   }, sharedKeyCredential);
   return `${blobClient.url}?${sasParams.toString()}`;
 }
-/**
- * Central type for blob manifest JSON structure
- */
-export interface BlobManifest {
-  id?: string;
-  link?: string;
-  media?: Array<{
-    type?: string;
-    url?: string;
-    [key: string]: any;
-  }>;
-  [key: string]: any;
-}
+// ...existing code...
 import { BlobServiceClient } from '@azure/storage-blob';
 /**
  * Uploads a JSON object to Azure Blob Storage

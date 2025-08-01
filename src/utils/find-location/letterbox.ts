@@ -6,7 +6,7 @@ import { logger } from '../shared/logger'
  * General letterbox entry point for all find-location messages.
  * Postman should call this with the message and context.
  */
-export const letterbox: LetterboxHandler = async (message) => {
+export const findLocationLetterbox: LetterboxHandler = async (message) => {
   console.info('[find-location.letterbox] Incoming message:', message);
   console.info('[find-location.letterbox] Workflow context:', message.workflow);
   console.info('[find-location.letterbox] batchId:', message.workflow?.batchId);

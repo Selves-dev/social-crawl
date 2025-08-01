@@ -1,9 +1,9 @@
 // Entrypoint for running a crawl search and mapping results
-import fetch from 'node-fetch';
-import { parseHtml as parseGoogleHtml } from './googleParser';
-import { parseHtml as parseTiktokHtml } from './tiktokParser';
-import { parseHtml as parseYoutubeHtml } from './youtubeParser';
-import { parseHtml as parseInstagramHtml } from './instagramParser';
+import axios from 'axios';
+import { parseGoogleHtml } from './googleParser';
+import { parseTikTokHtml } from './tiktokParser';
+import { parseYouTubeHtml } from './youtubeParser';
+import { parseInstagramHtml } from './instagramParser';
 
 import type { CrawlSearchResult } from './types';
 
@@ -32,13 +32,13 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
     // Nitro does not support fs/file output. Logging only.
     if (platform === 'tiktok') {
       console.log(`[crawlSearch] About to call parseTiktokHtml. Input length: ${html?.length}, first 200 chars: ${typeof html === 'string' ? html.slice(0, 200) : ''}`);
-      [result] = parseTiktokHtml(html);
+      [result] = parseTikTokHtml(html);
       if (!result) {
         console.warn(`[crawlSearch] TikTok parser returned no result for url: ${input}`);
       }
       return result;
     } else if (platform === 'youtube') {
-      [result] = parseYoutubeHtml(html);
+      [result] = parseYouTubeHtml(html);
       if (!result) {
         console.warn(`[crawlSearch] YouTube parser returned no result for url: ${input}`);
       }
@@ -115,18 +115,14 @@ export async function fetchWithRapidApi(url: string): Promise<any> {
   const endpoint = 'https://scrapeninja.p.rapidapi.com/scrape';
   // console.log(`[fetchWithRapidApi] Fetching URL: ${url}`);
   try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
+    const response = await axios.post(endpoint, { url }, {
       headers: {
         'Content-Type': 'application/json',
         'x-rapidapi-host': 'scrapeninja.p.rapidapi.com',
         'x-rapidapi-key': rapidApiKey,
-      },
-      body: JSON.stringify({ url }),
+      }
     });
-    const data = await response.json() as any;
-
-    return data;
+    return response.data;
   } catch (err) {
     console.error(`[fetchWithRapidApi] Error fetching URL: ${url}`, err);
     throw err;

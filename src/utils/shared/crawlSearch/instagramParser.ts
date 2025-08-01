@@ -78,7 +78,7 @@ function mapInstagramHtmlToCrawlSearchResult(html: string): CrawlSearchResult | 
   }
 }
 
-export function parseHtml(htmlContent: string): CrawlSearchResult[] {
+export function parseInstagramHtml(htmlContent: string): CrawlSearchResult[] {
   const mapped = mapInstagramHtmlToCrawlSearchResult(htmlContent);
   return mapped ? [mapped] : [];
 }

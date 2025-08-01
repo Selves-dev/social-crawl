@@ -1,8 +1,5 @@
 
 import { crawlSearch } from '../../shared/crawlSearch';
-// ...existing code...
-import { parseHtml as parseYoutubeHtml } from '../../shared/crawlSearch/youtubeParser';
-// import { parseHtml as parseInstagramHtml } from '../../shared/crawlSearch/instagramParser';
 import type { MediaObject } from '../../shared/crawlSearch/types';
 import { MediaScrapeJob } from '../../shared/types';
 import { uploadJsonToBlob, getBlobName, getPlatform } from '../../shared/azureBlob';

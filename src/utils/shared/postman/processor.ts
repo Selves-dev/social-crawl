@@ -61,7 +61,11 @@ export class PostmanProcessor {
     // ...existing code...
     const postmanMessage = message.body;
     if (!postmanMessage) {
-      logger.error('[postmanProcessor] No message body found', { message });
+      logger.error('[postmanProcessor] No message body found', undefined, {
+        service: 'postman-processor',
+        messageId: message.messageId,
+        message: message
+      });
       await this.receiver?.completeMessage(message);
       return;
     }
@@ -79,7 +83,11 @@ export class PostmanProcessor {
       // Util lookup
       const util = postmanMessage.util || postmanMessage.type;
       if (!util) {
-        logger.error('[postmanProcessor] No util specified in message', { postmanMessage });
+        logger.error('[postmanProcessor] No util specified in message', undefined, {
+          service: 'postman-processor',
+          messageId: message.messageId,
+          postmanMessage
+        });
         await this.receiver?.completeMessage(message);
         return;
       }

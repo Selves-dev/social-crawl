@@ -86,3 +86,8 @@ export interface YouTubeInitialData {
     // Use 'any' for flexibility, or add only the fields you actually use
     [key: string]: any;
 }
+
+export type SearchCrawlContext = {
+  query: string;
+  platform: string;
+};

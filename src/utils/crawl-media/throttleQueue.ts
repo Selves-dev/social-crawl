@@ -8,8 +8,10 @@ export class SearchCrawlThrottleQueue {
   private isInitialized = false;
   private isProcessing = false;
 
-  constructor(maxConcurrentJobs = 1) {
-    this.maxConcurrentJobs = maxConcurrentJobs;
+  constructor(maxConcurrentJobs?: number) {
+    // Read from env, default to 2
+    const envVal = process.env["SEARCH-CRAWL-MAX-CONCURRENT-JOBS"];
+    this.maxConcurrentJobs = maxConcurrentJobs ?? (envVal ? parseInt(envVal, 10) : 2);
   }
 
   async initialize(): Promise<void> {
@@ -61,8 +63,10 @@ export class CrawlMediaQueue {
   private isInitialized = false;
   private isProcessing = false;
 
-  constructor(maxConcurrentJobs = 1) {
-    this.maxConcurrentJobs = maxConcurrentJobs;
+  constructor(maxConcurrentJobs?: number) {
+    // Read from env, default to 2
+    const envVal = process.env["CRAWL-MEDIA-MAX-CONCURRENT-JOBS"];
+    this.maxConcurrentJobs = maxConcurrentJobs ?? (envVal ? parseInt(envVal, 10) : 2);
   }
 
   async initialize(): Promise<void> {
@@ -106,5 +110,5 @@ export class CrawlMediaQueue {
   }
 }
 
-export const searchCrawlQueue = new SearchCrawlThrottleQueue(1);
-export const crawlMediaQueue = new CrawlMediaQueue(1);
+export const searchCrawlQueue = new SearchCrawlThrottleQueue();
+export const crawlMediaQueue = new CrawlMediaQueue();
