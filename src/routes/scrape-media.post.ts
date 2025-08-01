@@ -19,7 +19,16 @@ export default defineEventHandler(async (event) => {
     await handleMediaScrape(job);
     return { status: 'ok', message: 'Media scrape triggered', link };
   } catch (err) {
-    logger.error('[scrape-media] Error handling request', err instanceof Error ? err : new Error(String(err)));
-    return { error: 'Failed to trigger media scrape' };
+    let errorMsg = 'Failed to trigger media scrape';
+    if (err && typeof err === 'object' && 'isAxiosError' in err && (err as any).isAxiosError) {
+      // Axios error: show status and message only
+      const status = (err as any).response?.status;
+      const msg = (err as any).message || '';
+      errorMsg = `AxiosError: ${msg}${status ? ' (status ' + status + ')' : ''}`;
+      logger.warn('[scrape-media] Axios error', { message: msg, status });
+    } else {
+      logger.error('[scrape-media] Error handling request', err instanceof Error ? err : new Error(String(err)));
+    }
+    return { error: errorMsg };
   }
 });
