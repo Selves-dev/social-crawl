@@ -1,5 +1,9 @@
 import { defineNitroPlugin } from 'nitropack/runtime'
 import { logger, serviceBus, getServiceBusConfigFromEnv, QueueManager } from '../utils/shared'
+import { startGetMediaIntray } from '../utils/get-media/letterbox'
+import { startPrepMediaIntray } from '../utils/prep-media/letterbox'
+import { startAnalyseMediaIntray } from '../utils/analyse-media/letterbox'
+import { startAIServiceIntray } from '../utils/ai-service/letterbox'
 
 
 export default defineNitroPlugin(async (nitroApp) => {
@@ -9,13 +13,18 @@ export default defineNitroPlugin(async (nitroApp) => {
     const config = getServiceBusConfigFromEnv()
     await serviceBus.connect(config)
     await QueueManager.initializeAllQueues()
-    // Start all queues (handlers are registered via letterbox imports above)
-    await QueueManager.startAllQueues()
-    // Note: post-office queue is managed separately by PostOffice plugin
-    logger.info('✅ Service bus and queues initialized and started', {
+    
+    // Register queue subscribers (intrays) - letterboxes handle queue subscription
+    startGetMediaIntray()
+    startPrepMediaIntray()
+    startAnalyseMediaIntray()
+    startAIServiceIntray()
+    
+    logger.info('✅ Service bus and queues initialized', {
       service: 'serviceBus',
-      queues: ['prep-media', 'ai-service', 'get-media',  'analyse-media']
+      queues: ['prep-media', 'ai-service', 'get-media', 'analyse-media']
     })
+    
     nitroApp.hooks.hook('close', async () => {
       logger.info('🛑 Gracefully shutting down service bus and queues...', { service: 'serviceBus' })
       try {

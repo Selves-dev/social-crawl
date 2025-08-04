@@ -2,22 +2,24 @@ import { logger } from '../../shared/logger';
 import { buildAnalysisPrompt } from '../handlers/buildAnalysisPrompts';
 import { sendToPostOffice } from '../../shared/postOffice/postman';
 import { getBlobJson } from '../../shared/azureBlob';
-import type { AnalyseMediaJob } from '../../shared/types';
 
-export async function handleAnalyseMedia(message: AnalyseMediaJob) {
+export async function handleAnalyseMedia(message: PostOfficeMessage) {
+  
   logger.info('handleAnalyseMedia called', { message });
 
-  // Ensure workflow and mediaUrl are defined
+  // Extract AnalyseMediaJob fields from PostOfficeMessage
   const workflow = message.workflow || {};
-  const mediaUrl = message.mediaUrl;
+  const payload = message.payload || {};
+  const mediaUrl = payload.mediaUrl;
+  const blobUrl = payload.blobUrl;
 
   // Fetch blobJson from blobUrl
   let blobJson;
-  if (message.blobUrl) {
+  if (blobUrl) {
     try {
-      blobJson = await getBlobJson(message.blobUrl);
+      blobJson = await getBlobJson(blobUrl);
     } catch (err) {
-      logger.warn('Failed to fetch blobJson from blobUrl', { error: (err as Error).message, blobUrl: message.blobUrl });
+      logger.warn('Failed to fetch blobJson from blobUrl', { error: (err as Error).message, blobUrl });
       blobJson = undefined;
     }
   }
@@ -33,7 +35,7 @@ export async function handleAnalyseMedia(message: AnalyseMediaJob) {
     workflow,
     payload: {
       prompt,
-      mediaUrl: message.blobUrl,
+      mediaUrl: blobUrl,
       responseHandler: {
         util: 'analyse-media',
         type: 'ai_response'

@@ -25,28 +25,28 @@ interface AIResponse {
 }
 
 // Main request handlers
-export async function handleTextRequest(msg: AIRequest): Promise<AIResponse> {
+export async function handleTextRequest(msg: any): Promise<AIResponse> {
   try {
     logger.info('[handleTextRequest] Processing text request');
-    logger.info('[handleTextRequest] Received AIRequest', { msg });
-    const messages = [{ role: 'user', content: msg.prompt }];
-    return await fetchOpenAIResponse(messages, msg.options || {});
+    const aiReq: AIRequest = msg.payload || msg; // Accept either PostOfficeMessage or AIRequest
+    logger.info('[handleTextRequest] Received AIRequest', { aiReq });
+    const messages = [{ role: 'user', content: aiReq.prompt }];
+    return await fetchOpenAIResponse(messages, aiReq.options || {});
   } catch (error) {
-    logger.error('[handleTextRequest] Error processing text request:', error);
+    logger.error('[handleTextRequest] Error processing text request:', error as Error);
     return createErrorResponse(error);
   }
 }
 
-export async function handleTextImageRequest(msg: AIRequest): Promise<AIResponse> {
+export async function handleTextImageRequest(msg: any): Promise<AIResponse> {
   try {
     logger.info('[handleTextImageRequest] Processing text+image request');
-    
-    const content = await buildMessageContent(msg.prompt, msg.mediaUrl);
+    const aiReq: AIRequest = msg.payload || msg;
+    const content = await buildMessageContent(aiReq.prompt, aiReq.mediaUrl);
     const messages = [{ role: 'user', content }];
-    return await fetchOpenAIResponse(messages, msg.options || {});
-    
+    return await fetchOpenAIResponse(messages, aiReq.options || {});
   } catch (error) {
-    logger.error('[handleTextImageRequest] Error processing text+image request:', error);
+    logger.error('[handleTextImageRequest] Error processing text+image request:', error as Error);
     return createErrorResponse(error);
   }
 }
@@ -65,7 +65,7 @@ export async function handleTextAudioRequest(msg: AIRequest): Promise<AIResponse
     };
     
   } catch (error) {
-    logger.error('[handleTextAudioRequest] Error processing text+audio request:', error);
+    logger.error('[handleTextAudioRequest] Error processing text+audio request:', error as Error);
     return createErrorResponse(error);
   }
 }
@@ -155,7 +155,7 @@ async function buildMessageContent(prompt: string, mediaUrl?: string): Promise<a
     }
 
   } catch (error) {
-    logger.error('[buildMessageContent] Error processing media manifest:', error);
+    logger.error('[buildMessageContent] Error processing media manifest:', error as Error);
     // Continue with text-only content rather than failing completely
   }
 
@@ -201,7 +201,7 @@ function createErrorResponse(error: unknown): AIResponse {
   return {
     error: true,
     message,
-    model: null,
+    model: undefined,
     success: false
   };
 }
@@ -231,7 +231,7 @@ async function compressAudio(buffer: Buffer): Promise<Buffer> {
       .audioBitrate('64k')
       .format('mp3')
       .on('error', (error) => {
-        logger.error('[compressAudio] FFmpeg error:', error);
+        logger.error('[compressAudio] FFmpeg error:', error as Error);
         reject(error);
       })
       .on('end', () => {

@@ -1,14 +1,12 @@
+import { ServiceBusReceiver, ServiceBusSender, ServiceBusReceivedMessage } from '@azure/service-bus';
 import { serviceBus } from '../shared/serviceBus';
 import { logger } from '../shared/logger';
 import { getSecurityManager } from '../shared/security';
-import { ServiceBusReceiver, ServiceBusSender, ServiceBusReceivedMessage } from '@azure/service-bus';
-import { handleAnalyseMedia } from './handlers/handleMediaAnalysis';
-import type { AnalyseMediaJob } from '../shared/types';
+import type { PostOfficeMessage } from '../shared/types';
 
 export class AnalyseMediaThrottleQueue {
   private receiver: ServiceBusReceiver | null = null;
   private sender: ServiceBusSender | null = null;
-  private isProcessing = false;
   private readonly queueName: string;
   private readonly maxConcurrentJobs: number;
 
@@ -32,18 +30,19 @@ export class AnalyseMediaThrottleQueue {
     });
   }
 
-  async sendJob(job: AnalyseMediaJob): Promise<void> {
+  async sendJob(job: PostOfficeMessage): Promise<void> {
     if (!this.sender) {
       throw new Error('Throttle queue not initialized');
     }
 
     const security = getSecurityManager();
     const applicationProperties = security.addMessageSecurity({
-      jobType: job.type || 'analyse-media',
-      timestamp: job.timestamp
+      jobType: job.type,
+      timestamp: Date.now().toString()
     });
 
-    const messageId = job.id || `analyse_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const messageId = `${job.util || 'analyse-media'}_${job.type}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
     await this.sender.sendMessages({
       body: job,
       contentType: 'application/json',
@@ -53,28 +52,41 @@ export class AnalyseMediaThrottleQueue {
 
     logger.info(`Analyse media job queued: ${messageId}`, {
       service: 'analyse-media',
-      jobId: job.id,
-      blobUrl: job.blobUrl
+      jobId: messageId,
+      jobType: job.type
     });
   }
 
-  async startProcessing(handler?: (job: AnalyseMediaJob) => Promise<void>): Promise<void> {
-    if (!this.receiver || this.isProcessing) {
-      return;
+  subscribe(handler: (message: PostOfficeMessage) => Promise<void>): void {
+    if (!this.receiver) {
+      throw new Error('AnalyseMediaThrottleQueue not initialized. Call initialize() first.');
     }
 
-    this.isProcessing = true;
-    logger.debug('Starting analyse media job processing', {
-      service: 'analyse-media',
-      maxConcurrency: this.maxConcurrentJobs
-    });
-
     this.receiver.subscribe({
-      processMessage: async (message: ServiceBusReceivedMessage) => {
-        await this.processJob(message, handler || handleAnalyseMedia);
+      processMessage: async (msg: ServiceBusReceivedMessage) => {
+        try {
+          const security = getSecurityManager();
+          if (!security.validateMessageSecurity(msg.applicationProperties)) {
+            logger.error('Analyse media job failed security validation', new Error('Invalid security token'), {
+              service: 'analyse-media',
+              messageId: msg.messageId
+            });
+            await this.receiver?.completeMessage(msg);
+            return;
+          }
+
+          await handler(msg.body as PostOfficeMessage);
+          await this.receiver?.completeMessage(msg);
+        } catch (error) {
+          logger.error('Message handler error', error as Error, {
+            service: 'analyse-media',
+            messageId: msg.messageId
+          });
+          await this.receiver?.abandonMessage(msg);
+        }
       },
       processError: async (args) => {
-        logger.error('Analyse media queue processing error', args.error, {
+        logger.error('AnalyseMediaThrottleQueue processing error', args.error, {
           service: 'analyse-media',
           source: args.errorSource
         });
@@ -85,50 +97,18 @@ export class AnalyseMediaThrottleQueue {
     });
   }
 
-  private async processJob(message: ServiceBusReceivedMessage, handler: (job: AnalyseMediaJob) => Promise<void>): Promise<void> {
-    let job: AnalyseMediaJob | null = null;
-    try {
-      const security = getSecurityManager();
-      if (!security.validateMessageSecurity(message.applicationProperties)) {
-        logger.error('Analyse media job failed security validation', new Error('Invalid security token'), {
-          service: 'analyse-media',
-          messageId: message.messageId
-        });
-        await this.receiver?.completeMessage(message);
-        return;
-      }
-
-      job = message.body as AnalyseMediaJob;
-      logger.info(`Processing analyse media job: ${job.id}`, {
-        service: 'analyse-media',
-        jobId: job.id,
-        blobUrl: job.blobUrl
-      });
-
-      await handler(job);
-      await this.receiver?.completeMessage(message);
-      logger.info(`Analyse media job completed: ${job.id}`, {
-        service: 'analyse-media',
-        jobId: job.id
-      });
-    } catch (error) {
-      logger.error(`Analyse media job failed: ${job?.id || 'unknown'}`, error as Error, {
-        service: 'analyse-media',
-        jobId: job?.id
-      });
-      await this.receiver?.abandonMessage(message);
-    }
-  }
-
   async stop(): Promise<void> {
     if (this.receiver) {
       await this.receiver.close();
       this.receiver = null;
     }
-    this.isProcessing = false;
-    logger.info('Analyse media throttle queue stopped', {
-      service: 'analyse-media'
-    });
+
+    if (this.sender) {
+      await this.sender.close();
+      this.sender = null;
+    }
+
+    logger.info('Analyse media throttle queue stopped', { service: 'analyse-media' });
   }
 }
 

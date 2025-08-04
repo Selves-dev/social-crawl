@@ -1,13 +1,12 @@
+import { ServiceBusReceiver, ServiceBusSender, ServiceBusReceivedMessage } from '@azure/service-bus';
 import { serviceBus } from '../shared/serviceBus';
 import { logger } from '../shared/logger';
 import { getSecurityManager } from '../shared/security';
-import { ServiceBusReceiver, ServiceBusSender } from '@azure/service-bus';
-import type { GetMediaJob } from '../shared/types';
+import type { PostOfficeMessage } from '../shared/types';
 
 export class GetMediaThrottleQueue {
   private receiver: ServiceBusReceiver | null = null;
   private sender: ServiceBusSender | null = null;
-  private isProcessing = false;
   private readonly queueName: string;
   private readonly maxConcurrentJobs: number;
 
@@ -18,10 +17,12 @@ export class GetMediaThrottleQueue {
 
   async initialize(): Promise<void> {
     if (!serviceBus.isConnected()) {
-      throw new Error('Service bus not connected. Ensure postman plugin is loaded.')
+      throw new Error('Service bus not connected. Ensure postman plugin is loaded.');
     }
+
     this.receiver = serviceBus.createQueueReceiver(this.queueName);
     this.sender = serviceBus.createQueueSender(this.queueName);
+
     logger.debug('Get media throttle queue initialized', {
       service: 'get-media',
       queueName: this.queueName,
@@ -29,23 +30,71 @@ export class GetMediaThrottleQueue {
     });
   }
 
-  async startProcessing(): Promise<void> {
-    if (this.isProcessing || !this.receiver) return;
-    this.isProcessing = true;
-    // TODO: Add message handler logic here
-    logger.debug('Get media queue started processing', { service: 'get-media' });
-  }
+  async sendJob(job: PostOfficeMessage): Promise<void> {
+    if (!this.sender) {
+      throw new Error('Throttle queue not initialized');
+    }
 
-  async sendJob(job: GetMediaJob): Promise<void> {
-    if (!this.sender) throw new Error('Queue sender not initialized');
     const security = getSecurityManager();
-    const applicationProperties = security.addMessageSecurity({ type: 'get-media' });
+    const applicationProperties = security.addMessageSecurity({
+      jobType: job.type,
+      timestamp: Date.now().toString()
+    });
+
+    const messageId = `${job.util || 'get-media'}_${job.type}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
     await this.sender.sendMessages({
       body: job,
       contentType: 'application/json',
+      messageId,
       applicationProperties
     });
-    logger.info('Job sent to get-media queue', { service: 'get-media', job });
+
+    logger.info(`Get media job queued: ${messageId}`, {
+      service: 'get-media',
+      jobId: messageId,
+      jobType: job.type
+    });
+  }
+
+  subscribe(handler: (message: PostOfficeMessage) => Promise<void>): void {
+    if (!this.receiver) {
+      throw new Error('GetMediaThrottleQueue not initialized. Call initialize() first.');
+    }
+
+    this.receiver.subscribe({
+      processMessage: async (msg: ServiceBusReceivedMessage) => {
+        try {
+          const security = getSecurityManager();
+          if (!security.validateMessageSecurity(msg.applicationProperties)) {
+            logger.error('Get media job failed security validation', new Error('Invalid security token'), {
+              service: 'get-media',
+              messageId: msg.messageId
+            });
+            await this.receiver?.completeMessage(msg);
+            return;
+          }
+
+          await handler(msg.body as PostOfficeMessage);
+          await this.receiver?.completeMessage(msg);
+        } catch (error) {
+          logger.error('Message handler error', error as Error, {
+            service: 'get-media',
+            messageId: msg.messageId
+          });
+          await this.receiver?.abandonMessage(msg);
+        }
+      },
+      processError: async (args) => {
+        logger.error('GetMediaThrottleQueue processing error', args.error, {
+          service: 'get-media',
+          source: args.errorSource
+        });
+      }
+    }, {
+      maxConcurrentCalls: this.maxConcurrentJobs,
+      autoCompleteMessages: false
+    });
   }
 
   async stop(): Promise<void> {
@@ -53,11 +102,12 @@ export class GetMediaThrottleQueue {
       await this.receiver.close();
       this.receiver = null;
     }
+
     if (this.sender) {
       await this.sender.close();
       this.sender = null;
     }
-    this.isProcessing = false;
+
     logger.info('Get media throttle queue stopped', { service: 'get-media' });
   }
 }

@@ -1,22 +1,14 @@
-/**
- * Prep Media Throttle Queue Utilities
- * Handles media preparation job throttling and processing
- */
-
-import { serviceBus } from '../shared/serviceBus'
-import { logger } from '../shared/logger'
-import { getSecurityManager } from '../shared/security'
-import { ServiceBusReceiver, ServiceBusSender, ServiceBusReceivedMessage } from '@azure/service-bus'
-import { handlePrepareMedia } from './handlers/handlePrepareMedia'
-
-import type { PrepMediaJob } from '../shared/types'
+import { ServiceBusReceiver, ServiceBusSender, ServiceBusReceivedMessage } from '@azure/service-bus';
+import { serviceBus } from '../shared/serviceBus';
+import { logger } from '../shared/logger';
+import { getSecurityManager } from '../shared/security';
+import type { PostOfficeMessage } from '../shared/types';
 
 export class PrepMediaThrottleQueue {
-  private receiver: ServiceBusReceiver | null = null
-  private sender: ServiceBusSender | null = null
-  private isProcessing = false
-  private readonly queueName: string
-  private readonly maxConcurrentJobs: number
+  private receiver: ServiceBusReceiver | null = null;
+  private sender: ServiceBusSender | null = null;
+  private readonly queueName: string;
+  private readonly maxConcurrentJobs: number;
 
   constructor() {
     this.queueName = process.env["asb-prep-media-queue"] || 'prep-media';
@@ -25,134 +17,100 @@ export class PrepMediaThrottleQueue {
 
   async initialize(): Promise<void> {
     if (!serviceBus.isConnected()) {
-      throw new Error('Service bus not connected. Ensure postman plugin is loaded.')
+      throw new Error('Service bus not connected. Ensure postman plugin is loaded.');
     }
 
-    this.receiver = serviceBus.createQueueReceiver(this.queueName)
-    this.sender = serviceBus.createQueueSender(this.queueName)
+    this.receiver = serviceBus.createQueueReceiver(this.queueName);
+    this.sender = serviceBus.createQueueSender(this.queueName);
+
     logger.debug('Prep media throttle queue initialized', {
       service: 'prep-media',
       queueName: this.queueName,
       maxConcurrentJobs: this.maxConcurrentJobs
-    })
+    });
   }
 
-  async sendJob(job: PrepMediaJob): Promise<void> {
+  async sendJob(job: PostOfficeMessage): Promise<void> {
     if (!this.sender) {
-      throw new Error('Throttle queue not initialized')
+      throw new Error('Throttle queue not initialized');
     }
 
-    // Add security token to message
-    const security = getSecurityManager()
+    const security = getSecurityManager();
     const applicationProperties = security.addMessageSecurity({
       jobType: job.type,
-      timestamp: job.timestamp
-    })
+      timestamp: Date.now().toString()
+    });
+
+    const messageId = `${job.util || 'prep-media'}_${job.type}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
     await this.sender.sendMessages({
       body: job,
       contentType: 'application/json',
-      messageId: job.id,
+      messageId,
       applicationProperties
-    })
+    });
 
-    logger.info(`Prep media job queued: ${job.id}`, {
+    logger.info(`Prep media job queued: ${messageId}`, {
       service: 'prep-media',
-      jobId: job.id,
-      mediaType: job.type
-    })
+      jobId: messageId,
+      jobType: job.type
+    });
   }
 
-  async startProcessing(): Promise<void> {
-    if (!this.receiver || this.isProcessing) {
-      return
+  subscribe(handler: (message: PostOfficeMessage) => Promise<void>): void {
+    if (!this.receiver) {
+      throw new Error('PrepMediaThrottleQueue not initialized. Call initialize() first.');
     }
 
-    this.isProcessing = true
-    logger.debug('Starting prep media job processing', {
-      service: 'prep-media',
-      maxConcurrency: this.maxConcurrentJobs
-    })
-
     this.receiver.subscribe({
-      processMessage: async (message: ServiceBusReceivedMessage) => {
-        await this.processJob(message)
+      processMessage: async (msg: ServiceBusReceivedMessage) => {
+        try {
+          const security = getSecurityManager();
+          if (!security.validateMessageSecurity(msg.applicationProperties)) {
+            logger.error('Prep media job failed security validation', new Error('Invalid security token'), {
+              service: 'prep-media',
+              messageId: msg.messageId
+            });
+            await this.receiver?.completeMessage(msg);
+            return;
+          }
+
+          await handler(msg.body as PostOfficeMessage);
+          await this.receiver?.completeMessage(msg);
+        } catch (error) {
+          logger.error('Message handler error', error as Error, {
+            service: 'prep-media',
+            messageId: msg.messageId
+          });
+          await this.receiver?.abandonMessage(msg);
+        }
       },
       processError: async (args) => {
-        logger.error('Prep media queue processing error', args.error, {
+        logger.error('PrepMediaThrottleQueue processing error', args.error, {
           service: 'prep-media',
           source: args.errorSource
-        })
+        });
       }
     }, {
       maxConcurrentCalls: this.maxConcurrentJobs,
       autoCompleteMessages: false
-    })
-  }
-
-  private async processJob(message: ServiceBusReceivedMessage): Promise<void> {
-    let job: PrepMediaJob | null = null
-    
-    try {
-      // Validate message security
-      const security = getSecurityManager()
-      if (!security.validateMessageSecurity(message.applicationProperties)) {
-        logger.error('Prep media job failed security validation', new Error('Invalid security token'), {
-          service: 'prep-media',
-          messageId: message.messageId
-        })
-        await this.receiver?.completeMessage(message)
-        return
-      }
-
-      job = message.body as PrepMediaJob
-      
-      logger.info(`Processing prep media job: ${job.id}`, {
-        service: 'prep-media',
-        jobId: job.id,
-        mediaType: job.type
-      })
-
-      // TODO: Implement actual media preparation logic
-      await this.prepareMedia(job)
-
-      // Complete the message on success
-      await this.receiver?.completeMessage(message)
-      
-      logger.info(`Prep media job completed: ${job.id}`, {
-        service: 'prep-media',
-        jobId: job.id
-      })
-
-    } catch (error) {
-      logger.error(`Prep media job failed: ${job?.id || 'unknown'}`, error as Error, {
-        service: 'prep-media',
-        jobId: job?.id
-      })
-
-      // Abandon the message for retry (or dead letter if max retries exceeded)
-      await this.receiver?.abandonMessage(message)
-    }
-  }
-
-  private async prepareMedia(job: PrepMediaJob): Promise<void> {
-    // Delegate to handler
-    handlePrepareMedia(job)
+    });
   }
 
   async stop(): Promise<void> {
     if (this.receiver) {
-      await this.receiver.close()
-      this.receiver = null
+      await this.receiver.close();
+      this.receiver = null;
     }
+
     if (this.sender) {
-      await this.sender.close()
-      this.sender = null
+      await this.sender.close();
+      this.sender = null;
     }
-    this.isProcessing = false
-    logger.info('Prep media throttle queue stopped', { service: 'prep-media' })
+
+    logger.info('Prep media throttle queue stopped', { service: 'prep-media' });
   }
 }
 
 // Export singleton instance
-export const prepMediaQueue = new PrepMediaThrottleQueue()
+export const prepMediaQueue = new PrepMediaThrottleQueue();

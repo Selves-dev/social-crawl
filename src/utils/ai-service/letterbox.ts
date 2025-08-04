@@ -1,8 +1,9 @@
-import type { LetterboxHandler } from '../shared/letterboxTypes';
+import type { PostOfficeMessage } from '../shared/types';
+import { aiServiceQueue } from './throttleQueue';
 import { sendToPostOffice } from '../shared/postOffice/postman';
-import { handleTextImageRequest, handleTextRequest } from './handlers/handleModelRequest'
-import { handleSearchRequest } from './handlers/handleSearchRequest'
-import { logger } from '../shared/logger'
+import { handleTextImageRequest, handleTextRequest } from './handlers/handleModelRequest';
+import { handleSearchRequest } from './handlers/handleSearchRequest';
+import { logger } from '../shared/logger';
 
 /**
  * AI-Service Letterbox - Internal Office Mail Handler
@@ -10,52 +11,65 @@ import { logger } from '../shared/logger'
  * Receives AI requests from PostOffice and handles internal processing.
  * Processes AI requests and sends responses back through the postal system.
  */
-const aiServiceLetterbox: LetterboxHandler = async (message) => {
-  // Expect standardized shape: { util, type, workflow, payload }
+// Function for PostOffice to deliver a message to the intray (enqueue to queue)
+export const aiServiceLetterbox: (message: PostOfficeMessage) => Promise<void> = async (message) => {
   const { util, type, workflow, payload } = message;
-  const responseHandler = payload?.responseHandler;
-  
+  logger.debug('[aiServiceLetterbox] Called with message', { util, type, workflow, payload });
   if (!workflow) {
-    logger.error('[ai-service letterbox] Missing workflow context in message');
-    throw new Error('[ai-service letterbox] Missing workflow context in message');
+    logger.error('[aiServiceLetterbox] Missing workflow context');
+    throw new Error('[aiServiceLetterbox] Missing workflow context');
   }
-
-  let aiResult;
-  switch (type) {
-    case 'text':
-      payload.modelType = 'text';
-      aiResult = await handleTextRequest(payload);
-      break;
-    case 'text-image':
-      payload.modelType = 'text-image';
-      aiResult = await handleTextImageRequest(payload);
-      break;
-    case 'search':
-      payload.modelType = 'search';
-      aiResult = await handleSearchRequest(payload);
-      break;
-    default:
-      aiResult = await handleTextRequest(payload);
-      break;
-  }
-
-  logger.debug('[ai-service letterbox] AI Response result', { aiResult });
-
-  if (responseHandler && responseHandler.util && responseHandler.type) {
-    await sendToPostOffice({
-      util: responseHandler.util,
-      type: responseHandler.type,
-      apiSecret: process.env['taash-secret'],
-      workflow,
-      payload: {
-        response: aiResult
-      }
-    });
-  } else {
-    logger.warn('[ai-service letterbox] No valid responseHandler specified', { responseHandler, workflow });
-  }
-
-  return { status: 'ai-request-processed', aiResult };
+  // Enqueue the message to aiServiceQueue
+  await aiServiceQueue.sendJob(message);
+  logger.debug('[aiServiceLetterbox] Message enqueued to aiServiceQueue', { type });
 }
 
-export { aiServiceLetterbox };
+// Register the intray as the queue subscriber
+export function startAIServiceIntray() {
+  logger.debug('[StartAIServiceIntray] Registering queue subscriber for aiServiceQueue');
+  aiServiceQueue.subscribe(async (message: PostOfficeMessage) => {
+    logger.info('[AI-Service-Intray] Received message from queue', { type: message.type, workflow: message.workflow, payload: message.payload });
+    const { type, workflow, payload } = message;
+    if (!workflow) {
+      logger.error('[AI-Service-Intray] Missing workflow context');
+      throw new Error('[AI-Service-Intray] Missing workflow context');
+    }
+    let result;
+    switch (type) {
+      case 'text':
+        logger.info('[AI-Service-Intray] Routing to handleTextRequest');
+        result = await handleTextRequest(message);
+        break;
+      case 'text-image':
+        logger.info('[AI-Service-Intray] Routing to handleTextImageRequest');
+        result = await handleTextImageRequest(message);
+        break;
+      case 'search':
+        logger.info('[AI-Service-Intray] Routing to handleSearchRequest');
+        result = await handleSearchRequest(message);
+        break;
+      default:
+        logger.warn('[ai-service] Unknown message type', { type: message.type, payload: message.payload });
+        result = { error: true, message: 'Unknown message type' };
+    }
+    // Send response back to PostOffice using responseHandler pattern
+    try {
+      const responseHandler = payload?.responseHandler;
+      if (!responseHandler || !responseHandler.util || !responseHandler.type) {
+        throw new Error('Missing responseHandler in payload');
+      }
+      await sendToPostOffice({
+        util: responseHandler.util,
+        type: responseHandler.type,
+        workflow,
+        payload: {
+          request: message,
+          result
+        }
+      });
+      logger.info('[AI-Service-Intray] Response sent to PostOffice', { workflow, result });
+    } catch (err) {
+      logger.error('[AI-Service-Intray] Failed to send response to PostOffice', err as Error, { workflow, result });
+    }
+  });
+}

@@ -1,5 +1,4 @@
 import type { SearchCrawlJob, MediaScrapeJob, PrepMediaJob, AnalyseMediaJob } from './types';
-import type { AIJob } from '../ai-service/throttleQueue';
 import * as azureBlobUtils from '../../utils/shared/azureBlob';
 import { prepMediaQueue } from '../prep-media/throttleQueue';
 import { aiServiceQueue } from '../ai-service/throttleQueue';
@@ -13,10 +12,9 @@ import { getMediaQueue } from '../get-media/throttleQueue';
 // Types for better type safety
 interface QueueInstance {
   initialize(): Promise<void>;
-  startProcessing(): Promise<void>;
   stop(): Promise<void>;
   sendJob(job: any): Promise<void>;
-  registerHandler?(handler: (job: any) => Promise<any>): void;
+  subscribe(handler: (job: any) => Promise<void>): void;
 }
 
 interface QueueConfig {
@@ -56,27 +54,10 @@ export class QueueManager {
     return queueConfig;
   }
 
-  // Helper method to check if queue supports handlers
-  private static hasRegisterHandler(instance: QueueInstance): instance is QueueInstance & { registerHandler: (handler: (job: any) => Promise<any>) => void } {
-    return 'registerHandler' in instance && typeof instance.registerHandler === 'function';
-  }
-
-  static async startQueue(name: string): Promise<void> {
-    if (this.running[name]) {
-      logger.info(`${name} queue already running`, { service: 'queue-manager', queue: name });
-      return;
-    }
-
-    const { instance } = this.findQueueConfig(name);
-    
-    try {
-      await instance.startProcessing();
-      this.running[name] = true;
-      logger.debug(`✅ ${name} queue started`, { service: 'queue-manager', queue: name });
-    } catch (error) {
-      logger.error(`Failed to start ${name} queue`, error as Error, { service: 'queue-manager', queue: name });
-      throw error;
-    }
+  // Helper method to check if queue supports handlers (deprecated - handlers now registered via letterbox subscribe)
+  private static hasRegisterHandler(instance: QueueInstance): boolean {
+    // This method is deprecated since we use letterbox.subscribe() pattern now
+    return false;
   }
 
   static async stopQueue(name: string): Promise<void> {
@@ -122,30 +103,6 @@ export class QueueManager {
     } catch (error) {
       logger.error('Failed to initialize queue-configs', error as Error, { service: 'queue-manager' });
       this._initialized = false; // Reset on failure
-      throw error;
-    }
-  }
-
-  static async startAllQueues(): Promise<void> {
-    if (this._started) {
-      logger.info('All queues already started, skipping.', { service: 'queue-manager' });
-      return;
-    }
-
-    if (!this._initialized) {
-      throw new Error('Queue-configs must be initialized before starting. Call initializeAllQueues() first.');
-    }
-
-    logger.info('🚀 Starting all queues...', { service: 'queue-manager' });
-    
-    try {
-      const startPromises = this.queueConfigs.map(({ name }) => this.startQueue(name));
-      await Promise.all(startPromises);
-      this._started = true;
-      logger.info('✅ All queues started', { service: 'queue-manager' });
-    } catch (error) {
-      logger.error('Failed to start all queues', error as Error, { service: 'queue-manager' });
-      this._started = false; // Reset on failure
       throw error;
     }
   }
