@@ -7,12 +7,13 @@ import { prepMediaLetterbox } from '../utils/prep-media/letterbox';
 import { aiServiceLetterbox } from '../utils/ai-service/letterbox';
 import { analyseMediaLetterbox } from '../utils/analyse-media/letterbox';
 import { getMediaLetterbox } from '../utils/get-media/letterbox';
+import { getMediaLetterbox } from '../utils/get-media/letterbox';
+import { findLocationLetterbox } from '../utils/find-location/letterbox';
 
 export default defineNitroPlugin(async (nitroApp) => {
   logger.info('🚀 Starting PostOffice plugin...', { service: 'post-office' })
   try {
-    // Register all letterboxes centrally
-    // postOffice.registerLetterbox('crawl-media', crawlMediaLetterbox);
+    postOffice.registerLetterbox('find-location', findLocationLetterbox);
     postOffice.registerLetterbox('prep-media', prepMediaLetterbox);
     postOffice.registerLetterbox('ai-service', aiServiceLetterbox);
     postOffice.registerLetterbox('analyse-media', analyseMediaLetterbox);

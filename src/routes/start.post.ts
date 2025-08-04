@@ -5,6 +5,8 @@ import { sendToPostOffice } from '../utils/shared/postOffice/postman';
 
 export default defineEventHandler(async (event) => {
   try {
+    // ...existing code...
+
     const body = await readBody(event)
     // Build workflow context
     const batchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2,8)}`;
@@ -22,9 +24,10 @@ export default defineEventHandler(async (event) => {
     };
     await sendToPostOffice({
       util: 'find-location',
-      payload: {
-        workflow
-      }
+      type: 'find-location-request',
+      workflow,
+      payload: {},
+      apiSecret: process.env['taash-secret']
     })
 
     return { status: 'queued', message: 'find-location request accepted for processing (via postman)' }

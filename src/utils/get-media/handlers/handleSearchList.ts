@@ -10,12 +10,12 @@ export async function handleSearchList(message: PostOfficeMessage): Promise<void
 
     logger.info('[search-list] handleSearchList START', { job });
     
-    if (!job.context?.query) {
-      logger.error('[search-list] Missing query in job context', new Error('Missing query in job'), { job });
+    if (!job.query) {
+      logger.error('[search-list] Missing query in job payload', new Error('Missing query in job'), { job });
       throw new Error('Missing query in job');
     }
 
-    const query = job.context.query;
+    const query = job.query;
     const rawResults = await crawlSearch(query);
     
     let parsedResults: Record<string, string[]> = {};
@@ -43,7 +43,8 @@ export async function handleSearchList(message: PostOfficeMessage): Promise<void
         await sendToPostOffice({
           util: 'get-media',
           type: 'get-media-queued',
-          workflow: job.workflow,
+          apiSecret: process.env['taash-secret'],
+          workflow,
           payload: {
             link,
             platform
@@ -52,7 +53,6 @@ export async function handleSearchList(message: PostOfficeMessage): Promise<void
         totalLinks++;
       }
     }
-    
     logger.info(`[search-list] Sent ${totalLinks} media scrape jobs to post-office`);
   } catch (error) {
     logger.error('[search-list] Error processing message', error instanceof Error ? error : new Error(String(error)));

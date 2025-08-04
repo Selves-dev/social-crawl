@@ -5,6 +5,14 @@ import { handleGetMedia } from './handlers/handleGetMedia';
 
 // Letterbox routes message to correct handler
 export async function getMediaLetterbox(message: PostOfficeMessage): Promise<void> {
+
+  const { util, type, workflow, payload } = message;
+
+  if (!workflow) {
+    logger.error('[find-location letterbox] Missing workflow context');
+    throw new Error('[find-location letterbox] Missing workflow context');
+  }
+
   switch (message.type) {
     case 'search-list':
       await handleSearchList(message);

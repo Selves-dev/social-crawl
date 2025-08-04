@@ -54,7 +54,8 @@ export async function handleGetMedia(message: PostOfficeMessage): Promise<void> 
       logger.info('[get-media] Routing blobUrl to post-office for prep-media', { blobUrl, workflow });
       await sendToPostOffice({
         util: 'prep-media',
-        type: 'prep-media-queued',
+        type: 'prep-media',
+        apiSecret: process.env['taash-secret'],
         workflow,
         payload: {
           blobUrl

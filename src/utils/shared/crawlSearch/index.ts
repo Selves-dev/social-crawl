@@ -1,5 +1,6 @@
 // Entrypoint for running a crawl search and mapping results
 import axios from 'axios';
+import { logger } from '../../shared/logger';
 import { parseGoogleHtml } from './googleParser';
 import { parseTikTokHtml } from './tiktokParser';
 import { parseYouTubeHtml } from './youtubeParser';
@@ -27,30 +28,30 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
     // Fetch HTML for the link
     const response = await fetchWithRapidApi(input);
     const html = typeof response === 'string' ? response : response.body;
-    console.log(`[crawlSearch] Fetched HTML for platform: ${platform}, url: ${input}, length: ${html?.length}`);
+    logger.debug(`[crawlSearch] Fetched HTML for platform: ${platform}, url: ${input}, length: ${html?.length}`);
     let result;
     // Nitro does not support fs/file output. Logging only.
     if (platform === 'tiktok') {
-      console.log(`[crawlSearch] About to call parseTiktokHtml. Input length: ${html?.length}, first 200 chars: ${typeof html === 'string' ? html.slice(0, 200) : ''}`);
+      logger.debug(`[crawlSearch] About to call parseTiktokHtml. Input length: ${html?.length}, first 200 chars: ${typeof html === 'string' ? html.slice(0, 200) : ''}`);
       [result] = parseTikTokHtml(html);
       if (!result) {
-        console.warn(`[crawlSearch] TikTok parser returned no result for url: ${input}`);
+        logger.warn(`[crawlSearch] TikTok parser returned no result for url: ${input}`);
       }
       return result;
     } else if (platform === 'youtube') {
       [result] = parseYouTubeHtml(html);
       if (!result) {
-        console.warn(`[crawlSearch] YouTube parser returned no result for url: ${input}`);
+        logger.warn(`[crawlSearch] YouTube parser returned no result for url: ${input}`);
       }
       return result;
     } else if (platform === 'instagram') {
       [result] = parseInstagramHtml(html);
       if (!result) {
-        console.warn(`[crawlSearch] Instagram parser returned no result for url: ${input}`);
+        logger.warn(`[crawlSearch] Instagram parser returned no result for url: ${input}`);
       }
       return result;
     } else {
-      console.warn(`[crawlSearch] Unknown platform or no parser for platform: ${platform}, url: ${input}`);
+      logger.warn(`[crawlSearch] Unknown platform or no parser for platform: ${platform}, url: ${input}`);
       return { link: input };
     }
   }
@@ -68,35 +69,35 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
   for (const platform of platforms) {
 
     const googleUrl = buildGoogleSearchUrl(input, platform);
-    console.log(`[crawlSearch] Building Google search URL for platform: ${platform}`);
-    console.log(`[crawlSearch] Google URL: ${googleUrl}`);
+    logger.debug(`[crawlSearch] Building Google search URL for platform: ${platform}`);
+    logger.debug(`[crawlSearch] Google URL: ${googleUrl}`);
 
     try {
       await randomDelay();
-      console.log(`[crawlSearch] Fetching Google search results for platform: ${platform}`);
+      logger.debug(`[crawlSearch] Fetching Google search results for platform: ${platform}`);
       const googleData = await fetchWithRapidApi(googleUrl);
 
-      console.log(`[crawlSearch] Parsing Google HTML for platform: ${platform}`);
+      logger.debug(`[crawlSearch] Parsing Google HTML for platform: ${platform}`);
 
       let htmlToParse = '';
       if (googleData && googleData.body) {
         htmlToParse = googleData.body;
-        console.log(`[crawlSearch] Using 'body' field from response for platform: ${platform}`);
+        logger.debug(`[crawlSearch] Using 'body' field from response for platform: ${platform}`);
 
       } else {
-        console.warn(`[crawlSearch] No body or html found in ScrapeNinja response for platform: ${platform}, url: ${googleUrl}`);
+        logger.warn(`[crawlSearch] No body or html found in ScrapeNinja response for platform: ${platform}, url: ${googleUrl}`);
         results[platform] = [];
         continue;
       }
 
-      console.log(`[crawlSearch] (Google) Raw HTML length:`, htmlToParse.length);
+      logger.debug(`[crawlSearch] (Google) Raw HTML length: ${htmlToParse.length}`);
       const links = parseGoogleHtml(htmlToParse, googleUrl).map(r => r.link);
-      console.log(`[crawlSearch] Parsed ${links.length} links for platform: ${platform}`);
+      logger.debug(`[crawlSearch] Parsed ${links.length} links for platform: ${platform}`);
 
       results[platform] = links;
 
     } catch (err) {
-      console.error(`[crawlSearch] Google fetch/parse error for ${platform}:`, err);
+      logger.error(`[crawlSearch] Google fetch/parse error for ${platform}:`, err instanceof Error ? err : new Error(String(err)));
       results[platform] = [];
     }
   }
@@ -109,7 +110,7 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
 export async function fetchWithRapidApi(url: string): Promise<any> {
   const rapidApiKey = process.env["rapidapi-key"];
   if (!rapidApiKey) {
-    console.error('[fetchWithRapidApi] RAPID-API-KEY is not set in environment variables.');
+    logger.error('[fetchWithRapidApi] RAPID-API-KEY is not set in environment variables.');
     throw new Error('RAPID-API-KEY is not set in environment variables.');
   }
   const endpoint = 'https://scrapeninja.p.rapidapi.com/scrape';
@@ -124,7 +125,7 @@ export async function fetchWithRapidApi(url: string): Promise<any> {
     });
     return response.data;
   } catch (err) {
-    console.error(`[fetchWithRapidApi] Error fetching URL: ${url}`, err);
+    logger.error(`[fetchWithRapidApi] Error fetching URL: ${url}`, err instanceof Error ? err : new Error(String(err)));
     throw err;
   }
 }

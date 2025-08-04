@@ -53,7 +53,7 @@ export class PostOfficeQueue {
       })
       this.receiver.subscribe({
         processMessage: async (message: ServiceBusReceivedMessage) => {
-          logger.info('📮 Post-office received message', {
+          logger.debug('📮 Post-office received message', {
             service: 'post-office-queue',
             messageId: message.messageId
           })
@@ -97,7 +97,7 @@ export class PostOfficeQueue {
     } catch (err) {
       safeAppProps = '[Unserializable applicationProperties]';
     }
-    logger.info('📮 [processMessage] ENTRY', {
+    logger.debug('📮 [processMessage] ENTRY', {
       service: 'post-office-queue',
       messageId: message.messageId,
       bodyType: typeof message.body,
@@ -106,7 +106,7 @@ export class PostOfficeQueue {
     });
 
     // Log before security validation
-    logger.info('📮 [processMessage] Before security validation', {
+    logger.debug('📮 [processMessage] Before security validation', {
       service: 'post-office-queue',
       messageId: message.messageId,
       applicationProperties: message.applicationProperties
@@ -173,7 +173,7 @@ export class PostOfficeQueue {
         return;
       }
 
-      logger.info('📮 Processing post-office message', {
+      logger.debug('📮 Processing post-office message', {
         service: 'post-office-queue',
         messageId: message.messageId,
         util: postOfficeMessage.util,
@@ -185,7 +185,7 @@ export class PostOfficeQueue {
       // Complete the message
       logger.debug('[DEBUG] Calling completeMessage after successful processing', { messageId: message.messageId });
       await this.receiver?.completeMessage(message);
-      logger.info('📮 Post-office message completed', {
+      logger.debug('📮 Post-office message completed', {
         service: 'post-office-queue',
         messageId: message.messageId,
         util: postOfficeMessage.util,

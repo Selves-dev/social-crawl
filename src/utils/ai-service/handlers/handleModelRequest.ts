@@ -28,10 +28,9 @@ interface AIResponse {
 export async function handleTextRequest(msg: AIRequest): Promise<AIResponse> {
   try {
     logger.info('[handleTextRequest] Processing text request');
-    
+    logger.info('[handleTextRequest] Received AIRequest', { msg });
     const messages = [{ role: 'user', content: msg.prompt }];
     return await fetchOpenAIResponse(messages, msg.options || {});
-    
   } catch (error) {
     logger.error('[handleTextRequest] Error processing text request:', error);
     return createErrorResponse(error);

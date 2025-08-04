@@ -1,4 +1,9 @@
-// --- sendToPostOffice migrated from router.ts ---
+
+import { logger } from '../logger'
+import { WorkflowTracker } from '../workflow'
+import { WorkflowContext, WorkflowStage } from '../../ai-service/types/types'
+// Export singleton instance
+import { postOfficeQueue } from './queue' 
 
 export interface Letterbox {
   (message: any): Promise<any>
@@ -16,7 +21,8 @@ export class PostOffice {
    */
   async routeMessage(message: any): Promise<void> {
     const { util, type, workflow, payload } = message
-    logger.info('📮 PostOffice routing message', {
+    logger.debug('[PostOffice] Received message', { util, type, workflowId: workflow?.batchId || 'unknown', payload });
+    logger.debug('📮 PostOffice routing message', {
       service: 'post-office',
       util,
       type,
@@ -34,13 +40,13 @@ export class PostOffice {
       throw new Error(`PostOffice: No letterbox registered for util: ${util}`)
     }
     try {
-      logger.info(`📪✉️ Delivering message to ${util} letterbox`, {
+      logger.debug(`📪✉️ Delivering message to ${util} letterbox`, {
         service: 'post-office',
         util,
         type
       })
       await letterbox(message)
-      logger.info(`📪✅ Message delivered successfully to ${util} letterbox`, {
+      logger.debug(`📪✅ Message delivered successfully to ${util} letterbox`, {
         service: 'post-office',
         util,
         type
@@ -85,27 +91,27 @@ let persistentSender: any = null;
 
 export async function sendToPostOffice(message: any): Promise<void> {
   try {
-    logger.info('[sendToPostOffice] Called', { message });
+    logger.debug('[sendToPostOffice] Called', { message });
     if (!message || typeof message !== 'object') {
       logger.error('[sendToPostOffice] Invalid message: not an object', new Error(JSON.stringify({ message })));
       throw new Error('sendToPostOffice: message must be an object');
     }
     // Enforce API secret validation globally
-    const apiSecret = process.env.API_SECRET;
+    const apiSecret = process.env['taash-secret'];
     const clientSecret = message.apiSecret || message?.payload?.apiSecret;
     if (!apiSecret || clientSecret !== apiSecret) {
       logger.error('[sendToPostOffice] Unauthorized: Invalid API secret', new Error('Invalid API secret'), { clientSecret });
       throw new Error('sendToPostOffice: Unauthorized: Invalid API secret');
     }
     const { util, type, workflow, payload } = message;
-    logger.info('[sendToPostOffice] Validating message fields', { util, type, workflow, payload });
+    logger.debug('[sendToPostOffice] Validating message fields', { util, type, workflow, payload });
     if (!util) {
       logger.error('[sendToPostOffice] Missing util', new Error(JSON.stringify({ message })));
       throw new Error('sendToPostOffice: message.util is required');
     }
     if (!type) {
-      logger.error('[sendToPostOffice] Missing type', new Error(JSON.stringify({ message })));
-      throw new Error('sendToPostOffice: message.type is required');
+      logger.warn('[sendToPostOffice] Missing type', { message });
+      // type is now optional, do not throw
     }
     if (!workflow || typeof workflow !== 'object') {
       logger.error('[sendToPostOffice] Invalid workflow', new Error(JSON.stringify({ workflow })));
@@ -118,16 +124,16 @@ export async function sendToPostOffice(message: any): Promise<void> {
 
     // Always send to the single post-office queue
     const queueName = process.env['asb-post-office-queue'] || 'post-office';
-    logger.info('[sendToPostOffice] Sending to post-office queue', { queueName });
+    logger.debug('[sendToPostOffice] Sending to post-office queue', { queueName });
     if (!persistentSender) {
       persistentSender = serviceBus.createQueueSender(queueName);
-      logger.info('[sendToPostOffice] Created persistent sender for queue', { queueName });
+      logger.debug('[sendToPostOffice] Created persistent sender for queue', { queueName });
     }
     const security = getSecurityManager();
     const applicationProperties = security.addMessageSecurity({ type });
     const messageBody = { util, type, workflow, payload };
     const messageId = message?.id || undefined;
-    logger.info('[sendToPostOffice] Sending message to post-office queue', {
+    logger.debug('[sendToPostOffice] Sending message to post-office queue', {
       queueName,
       messageBody,
       messageId,
@@ -139,7 +145,7 @@ export async function sendToPostOffice(message: any): Promise<void> {
       messageId,
       applicationProperties
     });
-    logger.info('[sendToPostOffice] Message sent successfully to post-office', {
+    logger.debug('[sendToPostOffice] Message sent successfully to post-office', {
       queueName,
       messageId
     });
@@ -150,11 +156,6 @@ export async function sendToPostOffice(message: any): Promise<void> {
     throw error;
   }
 }
-import { logger } from '../logger'
-import { WorkflowTracker } from '../workflow'
-import { WorkflowContext, WorkflowStage } from '../../ai-service/types/types'
-// Export singleton instance
-import { postOfficeQueue } from './queue'
 
 
 export class PostmanProcessor {

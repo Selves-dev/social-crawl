@@ -1,13 +1,8 @@
-import type { LetterboxHandler } from '../shared/letterboxTypes';
+import type { LetterboxHandler } from '../shared/types';
 import { handleLocationRequest, handleLocationResponse } from './handlers/handleFindLocation'
 import { logger } from '../shared/logger'
 
-/**
- * Find-Location Letterbox - Internal Office Mail Handler
- * 
- * Receives mail from PostOffice and handles internal routing within the post office.
- * Puts messages in appropriate internal trays and processes them.
- */
+
 const findLocationLetterbox: LetterboxHandler = async (message) => {
   // Expect standardized shape: { util, type, workflow, payload }
   const { util, type, workflow, payload } = message;

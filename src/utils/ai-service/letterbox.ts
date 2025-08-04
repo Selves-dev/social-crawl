@@ -12,7 +12,8 @@ import { logger } from '../shared/logger'
  */
 const aiServiceLetterbox: LetterboxHandler = async (message) => {
   // Expect standardized shape: { util, type, workflow, payload }
-  const { util, type, workflow, payload, responseHandler } = message;
+  const { util, type, workflow, payload } = message;
+  const responseHandler = payload?.responseHandler;
   
   if (!workflow) {
     logger.error('[ai-service letterbox] Missing workflow context in message');
@@ -38,19 +39,20 @@ const aiServiceLetterbox: LetterboxHandler = async (message) => {
       break;
   }
 
-  logger.info('[ai-service letterbox] AI handler result', { aiResult });
+  logger.debug('[ai-service letterbox] AI Response result', { aiResult });
 
   if (responseHandler && responseHandler.util && responseHandler.type) {
     await sendToPostOffice({
       util: responseHandler.util,
       type: responseHandler.type,
+      apiSecret: process.env['taash-secret'],
       workflow,
       payload: {
         response: aiResult
       }
     });
   } else {
-    logger.warn('[ai-service letterbox] No valid responseHandler specified', { workflow });
+    logger.warn('[ai-service letterbox] No valid responseHandler specified', { responseHandler, workflow });
   }
 
   return { status: 'ai-request-processed', aiResult };
