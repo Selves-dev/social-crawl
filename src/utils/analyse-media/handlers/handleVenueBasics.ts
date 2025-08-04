@@ -1,7 +1,7 @@
 
 import { logger } from '../../shared/logger';
 import { getBlobJson } from '../../shared/azureBlob';
-import { sendToPostOffice } from '../../shared/postOffice/router';
+import { sendToPostOffice } from '../../shared/postOffice/postman';
 import { buildVenueBasicsPrompt } from './buildAnalysisPrompts';
 
 

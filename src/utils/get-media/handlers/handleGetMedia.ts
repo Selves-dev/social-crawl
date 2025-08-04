@@ -4,7 +4,7 @@ import type { MediaObject } from '../../shared/crawlSearch/types';
 import { uploadJsonToBlob, getBlobName, getPlatform } from '../../shared/azureBlob';
 import type { BlobManifest } from '../../shared/types';
 import { logger } from '../../shared/logger';
-import { sendToPostOffice } from '../../shared/postOffice/router';
+import { sendToPostOffice } from '../../shared/postOffice/postman';
 
 export async function handleGetMedia(message: PostOfficeMessage): Promise<void> {
   try {

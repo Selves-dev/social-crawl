@@ -30,8 +30,7 @@ export class PrepMediaThrottleQueue {
 
     this.receiver = serviceBus.createQueueReceiver(this.queueName)
     this.sender = serviceBus.createQueueSender(this.queueName)
-
-    logger.info('Prep media throttle queue initialized', {
+    logger.debug('Prep media throttle queue initialized', {
       service: 'prep-media',
       queueName: this.queueName,
       maxConcurrentJobs: this.maxConcurrentJobs
@@ -70,7 +69,7 @@ export class PrepMediaThrottleQueue {
     }
 
     this.isProcessing = true
-    logger.info('Starting prep media job processing', {
+    logger.debug('Starting prep media job processing', {
       service: 'prep-media',
       maxConcurrency: this.maxConcurrentJobs
     })

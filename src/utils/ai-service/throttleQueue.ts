@@ -42,7 +42,7 @@ export class AIServiceThrottleQueue {
   }
 
   async initialize(): Promise<void> {
-    logger.info('AIServiceThrottleQueue.initialize called', { queueName: this.queueName })
+    logger.debug('AIServiceThrottleQueue.initialize called', { queueName: this.queueName })
     if (!serviceBus.isConnected()) {
       throw new Error('Service bus not connected. Ensure postman plugin is loaded.')
     }
@@ -50,7 +50,7 @@ export class AIServiceThrottleQueue {
     this.receiver = serviceBus.createQueueReceiver(this.queueName)
     this.sender = serviceBus.createQueueSender(this.queueName)
 
-    logger.info('AI service throttle queue initialized', {
+    logger.debug('AI service throttle queue initialized', {
       service: 'ai-service',
       queueName: this.queueName,
       maxConcurrentJobs: this.maxConcurrentJobs
@@ -84,13 +84,13 @@ export class AIServiceThrottleQueue {
   }
 
   async startProcessing(): Promise<void> {
-    logger.info('startProcessing called', { isProcessing: this.isProcessing, receiver: !!this.receiver })
+    logger.debug('startProcessing called', { isProcessing: this.isProcessing, receiver: !!this.receiver })
     if (!this.receiver || this.isProcessing) {
       return
     }
 
     this.isProcessing = true
-    logger.info('Starting AI job processing', {
+    logger.debug('Starting AI job processing', {
       service: 'ai-service',
       maxConcurrency: this.maxConcurrentJobs
     })

@@ -22,7 +22,7 @@ export class GetMediaThrottleQueue {
     }
     this.receiver = serviceBus.createQueueReceiver(this.queueName);
     this.sender = serviceBus.createQueueSender(this.queueName);
-    logger.info('Get media throttle queue initialized', {
+    logger.debug('Get media throttle queue initialized', {
       service: 'get-media',
       queueName: this.queueName,
       maxConcurrentJobs: this.maxConcurrentJobs
@@ -33,7 +33,7 @@ export class GetMediaThrottleQueue {
     if (this.isProcessing || !this.receiver) return;
     this.isProcessing = true;
     // TODO: Add message handler logic here
-    logger.info('Get media throttle queue started processing', { service: 'get-media' });
+    logger.debug('Get media queue started processing', { service: 'get-media' });
   }
 
   async sendJob(job: GetMediaJob): Promise<void> {

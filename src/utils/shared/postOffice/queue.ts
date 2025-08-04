@@ -2,7 +2,7 @@
 import { serviceBus } from '../serviceBus'
 import { logger } from '../logger'
 import { getSecurityManager } from '../security'
-import { postOffice } from './index'
+import { postOffice } from './postman'
 import type { PostOfficeMessage } from '../types'
 import { ServiceBusReceiver, ServiceBusReceivedMessage } from '@azure/service-bus'
 
@@ -36,7 +36,7 @@ export class PostOfficeQueue {
         })
         return
       } else {
-        logger.info('[PostOfficeQueue] Starting queue processing...', {
+        logger.info('📮 [PostOfficeQueue] Starting queue processing...', {
           receiverInitialized: !!this.receiver,
           isProcessing: this.isProcessing
         })

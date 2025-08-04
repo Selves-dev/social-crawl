@@ -9,7 +9,7 @@ import * as os from 'os';
 
 import { extractVideoSegments, handleStoryboard } from './handleStoryboard';
 import { handleDownload, handleDownloadThumbnail } from './handleDownload';
-import { sendToPostOffice } from '../../shared/postOffice/router';
+import { sendToPostOffice } from '../../shared/postOffice/postman';
 
 export async function handlePrepareMedia(message: any) {
   logger.info('handlePrepareMedia called', { message });

@@ -72,7 +72,7 @@ export class QueueManager {
     try {
       await instance.startProcessing();
       this.running[name] = true;
-      logger.info(`✅ ${name} queue started`, { service: 'queue-manager', queue: name });
+      logger.debug(`✅ ${name} queue started`, { service: 'queue-manager', queue: name });
     } catch (error) {
       logger.error(`Failed to start ${name} queue`, error as Error, { service: 'queue-manager', queue: name });
       throw error;
@@ -103,7 +103,7 @@ export class QueueManager {
       return;
     }
 
-    logger.info('Initializing all queues...', { service: 'queue-manager' });
+    logger.info('🚀 Initializing all queues...', { service: 'queue-manager' });
     
     try {
       const initPromises = this.queueConfigs.map(async ({ name, instance }) => {
@@ -136,7 +136,7 @@ export class QueueManager {
       throw new Error('Queue-configs must be initialized before starting. Call initializeAllQueues() first.');
     }
 
-    logger.info('Starting all queues...', { service: 'queue-manager' });
+    logger.info('🚀 Starting all queues...', { service: 'queue-manager' });
     
     try {
       const startPromises = this.queueConfigs.map(({ name }) => this.startQueue(name));
@@ -192,7 +192,7 @@ export class QueueManager {
     
     try {
       await instance.sendJob(job);
-      logger.debug(`Job sent to ${queueName} queue`, { 
+      logger.info(`Job sent to ${queueName} queue`, { 
         service: 'queue-manager', 
         queue: queueName,
         jobType: job?.type 

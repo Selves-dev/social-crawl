@@ -3,89 +3,15 @@
  * Combines workflow context management and MongoDB persistence for the social crawl workflow
  */
 
+import {
+  WorkflowStage,
+  WorkflowContext,
+  LocationDocument,
+  MediaDocument,
+  WorkflowDocument
+} from '../ai-service/types/types'
 import { db } from '../shared/database'
 import { logger } from '../shared/logger'
-
-// Workflow stages enum
-export enum WorkflowStage {
-  FIND_LOCATION = 'find-location',
-  CONTROL = 'control',           // Query generation
-  CRAWL_MEDIA = 'crawl-media',   // Video scraping
-  PREP_MEDIA = 'prep-media',     // Download and prepare
-  ANALYSE_MEDIA = 'analyse-media', // AI analysis
-  ENRICH_VENUE = 'enrich-venue'  // Data enrichment
-}
-
-// Base workflow context that gets passed through all messages
-export interface WorkflowContext {
-  batchId: string              // Parent batch ID for the location
-  locationId: string           // The location being processed
-  locationName?: string        // Human readable location name
-  countryCode?: string         // Country code (cc) for the location
-  stage: WorkflowStage        // Current stage
-  timestamp: string           // When this context was created/updated
-  itemId?: string             // Individual video/media item ID
-  itemUrl?: string            // Source URL of the media
-  itemType?: 'video' | 'image' | 'post'
-  completedStages: WorkflowStage[]
-  metadata: {
-    inputQueries?: string[]        // User-provided queries at workflow start
-    generatedQueries?: string[]    // Generated search queries (from control stage)
-    mediaInfo?: any               // Media metadata (from prep-media)
-    analysisResults?: any         // AI analysis results (from analyse-media)
-    enrichmentData?: any          // Final enriched data (from enrich-venue)
-    [key: string]: any            // Extensible for other data
-  }
-  errors?: Array<{
-    stage: WorkflowStage
-    error: string
-    timestamp: string
-  }>
-  query?: string // Optional query for flow propagation
-}
-
-// Document interfaces for DB
-export interface LocationDocument {
-  _id?: string
-  locationId: string
-  locationName?: string
-  countryCode?: string
-  createdAt: Date
-  updatedAt: Date
-  metadata: {
-    queries?: string[]
-    coordinates?: {
-      lat: number
-      lng: number
-    }
-  }
-}
-
-export interface MediaDocument {
-  _id?: string
-  itemId: string
-  itemUrl: string
-  itemType: 'video' | 'image' | 'post'
-  locationId: string
-  batchId: string
-  processedAt?: Date
-  metadata: {
-    duration?: number
-    size?: number
-    analysisResults?: any
-  }
-}
-
-export interface WorkflowDocument {
-  _id?: string
-  batchId: string
-  locationId: string
-  status: 'active' | 'completed' | 'failed'
-  currentStage: string
-  createdAt: Date
-  updatedAt: Date
-  context: WorkflowContext
-}
 
 /**
  * Workflow context management utilities

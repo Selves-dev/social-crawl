@@ -1,5 +1,5 @@
 
-import { sendToPostOffice } from '../utils/shared/postOffice/router';
+import { sendToPostOffice } from '../utils/shared/postOffice/postman';
 import { defineEventHandler, readBody } from 'h3';
 
 export default defineEventHandler(async (event) => {

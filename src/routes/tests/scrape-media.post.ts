@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
-import { sendToPostOffice } from '../../utils/shared/postOffice/router';
+import { sendToPostOffice } from '../../utils/shared/postOffice/postman';
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);

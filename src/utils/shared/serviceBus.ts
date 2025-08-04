@@ -20,7 +20,7 @@ class ServiceBusManager {
 
   async connect(config: ServiceBusConfig): Promise<void> {
     try {
-      logger.info('Connecting to Azure Service Bus...', { service: 'service-bus' })
+      logger.info('🔌 Connecting to Azure Service Bus...', { service: 'service-bus' })
       
       this.config = config
       this.client = new ServiceBusClient(config.connectionString)

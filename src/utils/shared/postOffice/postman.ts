@@ -1,48 +1,21 @@
-import { logger } from '../logger'
-// Node-only: Enable verbose logging for Azure Service Bus SDK and route to app logger
-if (typeof process !== 'undefined' && process.versions?.node) {
-  try {
-    // Dynamically require to avoid plugin bundling issues
-    const { setLogLevel, setLogger } = require('@azure/logger');
-    setLogLevel('info');
-    setLogger({
-      info: (...args) => logger.info('[AzureSDK]', ...args),
-      warning: (...args) => logger.warn('[AzureSDK]', ...args),
-      error: (...args) => logger.error('[AzureSDK]', ...args),
-      verbose: (...args) => logger.debug('[AzureSDK]', ...args),
-    });
-    process.env['AZURE_LOG_LEVEL'] = 'info';
-    logger.info('[sendToPostOffice] Set AZURE_LOG_LEVEL to info for diagnostics');
-  } catch (err) {
-    logger.warn('[sendToPostOffice] Azure logger setup failed', { error: err });
-  }
-}
-import type { PostOfficeMessage } from '../types'
-import { getSecurityManager } from '../security'
-import { serviceBus } from '../serviceBus'
-
+// --- sendToPostOffice migrated from router.ts ---
 
 export interface Letterbox {
-  (message: PostOfficeMessage): Promise<any>
+  (message: any): Promise<any>
 }
 
 export class PostOffice {
   private letterboxes: Map<string, Letterbox> = new Map()
 
- registerLetterbox(util: string, letterbox: Letterbox): void {
+  registerLetterbox(util: string, letterbox: Letterbox): void {
     this.letterboxes.set(util, letterbox)
-    logger.info(`📪 Letterbox registered for util: ${util}`, {
-      service: 'post-office',
-      util
-    })
   }
 
   /**
    * Route a message to the appropriate letterbox based on util field
    */
-  async routeMessage(message: PostOfficeMessage): Promise<void> {
+  async routeMessage(message: any): Promise<void> {
     const { util, type, workflow, payload } = message
-
     logger.info('📮 PostOffice routing message', {
       service: 'post-office',
       util,
@@ -52,7 +25,6 @@ export class PostOffice {
 
     // Find the letterbox for this util
     const letterbox = this.letterboxes.get(util)
-    
     if (!letterbox) {
       logger.error(`📪❌ No letterbox found for util: ${util}`, new Error(`Unknown util: ${util}`), {
         service: 'post-office',
@@ -61,16 +33,13 @@ export class PostOffice {
       })
       throw new Error(`PostOffice: No letterbox registered for util: ${util}`)
     }
-
     try {
       logger.info(`📪✉️ Delivering message to ${util} letterbox`, {
         service: 'post-office',
         util,
         type
       })
-
       await letterbox(message)
-
       logger.info(`📪✅ Message delivered successfully to ${util} letterbox`, {
         service: 'post-office',
         util,
@@ -109,13 +78,9 @@ export class PostOffice {
     };
   }
 }
+import { getSecurityManager } from '../security'
+import { serviceBus } from '../serviceBus'
 
-
-/**
- * Send a message to the single post-office queue for routing to letterboxes.
- * All validation and logging is retained.
- */
-// Persistent sender instance for post-office queue
 let persistentSender: any = null;
 
 export async function sendToPostOffice(message: any): Promise<void> {
@@ -124,6 +89,13 @@ export async function sendToPostOffice(message: any): Promise<void> {
     if (!message || typeof message !== 'object') {
       logger.error('[sendToPostOffice] Invalid message: not an object', new Error(JSON.stringify({ message })));
       throw new Error('sendToPostOffice: message must be an object');
+    }
+    // Enforce API secret validation globally
+    const apiSecret = process.env.API_SECRET;
+    const clientSecret = message.apiSecret || message?.payload?.apiSecret;
+    if (!apiSecret || clientSecret !== apiSecret) {
+      logger.error('[sendToPostOffice] Unauthorized: Invalid API secret', new Error('Invalid API secret'), { clientSecret });
+      throw new Error('sendToPostOffice: Unauthorized: Invalid API secret');
     }
     const { util, type, workflow, payload } = message;
     logger.info('[sendToPostOffice] Validating message fields', { util, type, workflow, payload });
@@ -178,5 +150,81 @@ export async function sendToPostOffice(message: any): Promise<void> {
     throw error;
   }
 }
+import { logger } from '../logger'
+import { WorkflowTracker } from '../workflow'
+import { WorkflowContext, WorkflowStage } from '../../ai-service/types/types'
 // Export singleton instance
-export const postOffice = new PostOffice()
+import { postOfficeQueue } from './queue'
+
+
+export class PostmanProcessor {
+  async initialize(): Promise<void> {
+    // Initialize the post-office queue
+    await postOfficeQueue.initialize()
+    
+    logger.info('[postmanProcessor] PostOffice and letterboxes initialized', {
+      service: 'postman-processor',
+      registeredUtils: postOffice.getRegisteredUtils()
+    })
+  }
+
+  async startProcessing(): Promise<void> {
+    logger.info('[postmanProcessor] Starting post-office queue processing via PostOffice', {
+      service: 'postman-processor'
+    })
+    
+    await postOfficeQueue.startProcessing()
+    
+    logger.info('[postmanProcessor] PostOffice processing started', {
+      service: 'postman-processor'
+    })
+  }
+
+  // Legacy workflow tracking methods - can be used by letterboxes if needed
+  
+  private async handleWorkflowProgress(context: WorkflowContext, payload: any): Promise<void> {
+    const progress = WorkflowTracker.getProgress(context)
+    
+    // Save workflow progress update to database
+    // await WorkflowDatabase.saveWorkflow(context)
+    
+    // ...existing code...
+  }
+
+  private async handleError(context: WorkflowContext, payload: { error: string, stage?: string }): Promise<void> {
+    const errorContext = WorkflowTracker.logError(context, payload.error)
+    
+    // Save error state to database
+    // await WorkflowDatabase.saveWorkflow(errorContext)
+    
+    // TODO: Implement error handling strategy (retry, dead letter, etc.)
+    logger.warn(`Error handling not yet implemented for: ${payload.error}`, {
+      service: 'postman-processor',
+      batchId: context.batchId
+    })
+  }
+
+  private async logWorkflowComplete(context: WorkflowContext): Promise<void> {
+    const progress = WorkflowTracker.getProgress(context)
+    
+    // Save final workflow state to database
+    // await WorkflowDatabase.saveWorkflow(context)
+    // await WorkflowDatabase.saveMediaItem(context)
+    
+    // ...existing code...
+  }
+
+  private generateItemId(): string {
+    return `item_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+  }
+
+  async stop(): Promise<void> {
+    logger.info('[postmanProcessor] Stopping post-office queue via PostOffice', {
+      service: 'postman-processor'
+    })
+    await postOfficeQueue.stop()
+  }
+}
+
+// Export singleton instance
+export const postOffice = new PostOffice();

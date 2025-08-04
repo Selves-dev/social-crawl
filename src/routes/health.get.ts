@@ -2,7 +2,7 @@ import { defineEventHandler, setHeaders } from 'h3'
 import { optionalAuth } from '../middleware/auth'
 import { db } from '../utils/shared/database'
 import { QueueManager } from '../utils/shared/queueManager'
-import { postOffice } from '../utils/shared/postOffice/router'
+import { postOffice } from '../utils/shared/postOffice/postman'
 
 export default defineEventHandler(async (event) => {
   const startTime = Date.now()

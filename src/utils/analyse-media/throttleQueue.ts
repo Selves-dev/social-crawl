@@ -25,7 +25,7 @@ export class AnalyseMediaThrottleQueue {
     this.receiver = serviceBus.createQueueReceiver(this.queueName);
     this.sender = serviceBus.createQueueSender(this.queueName);
 
-    logger.info('Analyse media throttle queue initialized', {
+    logger.debug('Analyse media throttle queue initialized', {
       service: 'analyse-media',
       queueName: this.queueName,
       maxConcurrentJobs: this.maxConcurrentJobs
@@ -64,7 +64,7 @@ export class AnalyseMediaThrottleQueue {
     }
 
     this.isProcessing = true;
-    logger.info('Starting analyse media job processing', {
+    logger.debug('Starting analyse media job processing', {
       service: 'analyse-media',
       maxConcurrency: this.maxConcurrentJobs
     });

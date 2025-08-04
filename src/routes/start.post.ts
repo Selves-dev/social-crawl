@@ -1,40 +1,31 @@
-import { defineEventHandler, readBody, sendError, createError } from 'h3'
-import { AIQueueMessage } from '../utils/ai-service/types/types'
-import { WorkflowContext } from '../utils/shared/workflow'
-import { sendToPostOffice } from '../utils/shared/postOffice/router'
+
+import { defineEventHandler, readBody, sendError, createError } from 'h3';
+import { WorkflowContext, WorkflowStage } from '../utils/ai-service/types/types';
+import { sendToPostOffice } from '../utils/shared/postOffice/postman';
 
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event)
-
-    // Basic validation
-    // No prompt required for find-location; prompt is built in handler
-    // Always create workflow context from scratch
+    // Build workflow context
     const batchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2,8)}`;
-    const { getSecurityManager } = await import('../utils/shared/security');
-    const security = getSecurityManager();
-    const messageSecurity = security.addMessageSecurity({ batchId, stage: 'find-location', timestamp: new Date().toISOString() });
-    let workflow = {
+    const workflow: WorkflowContext = {
       batchId,
-      stage: 'find-location',
+      locationId: body.locationId || '',
+      locationName: body.locationName,
+      countryCode: body.countryCode,
+      stage: WorkflowStage.FIND_LOCATION,
       timestamp: new Date().toISOString(),
-      messageSecurity
+      completedStages: [],
+      metadata: {
+        inputQueries: body.inputQueries || []
+      }
     };
-    // ...existing code...
-
-    // Send a postman message with util and type at the top level for generic routing
     await sendToPostOffice({
       util: 'find-location',
       payload: {
-        type: body.type || 'find-location-request',
-        workflow,
-        responseHandler: body.responseHandler,
-        options: body.options,
-        meta: body.meta
+        workflow
       }
     })
-    console.info('[start.post] Sent postman message with workflow:', workflow);
-    console.info('[start.post] batchId sent:', workflow?.batchId);
 
     return { status: 'queued', message: 'find-location request accepted for processing (via postman)' }
   } catch (err: any) {

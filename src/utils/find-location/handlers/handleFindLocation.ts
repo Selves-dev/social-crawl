@@ -1,5 +1,5 @@
 import { logger } from '../../shared/logger'
-import { sendToPostOffice } from '../../shared/postOffice/router'
+import { sendToPostOffice } from '../../shared/postOffice/postman'
 import { db } from '../../shared/database'
 import { upsertLocationData } from './handleLocationData'
 // Location-Finder: Handlers only (letterbox is in letterbox.ts)

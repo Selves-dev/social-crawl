@@ -1,5 +1,5 @@
 import type { LetterboxHandler } from '../shared/letterboxTypes';
-import { sendToPostOffice } from '../shared/postOffice/router';
+import { sendToPostOffice } from '../shared/postOffice/postman';
 import { handleTextImageRequest, handleTextRequest } from './handlers/handleModelRequest'
 import { handleSearchRequest } from './handlers/handleSearchRequest'
 import { logger } from '../shared/logger'

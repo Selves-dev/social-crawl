@@ -1,5 +1,5 @@
 import type { PostOfficeMessage } from '../../shared/types';
-import { sendToPostOffice } from '../../shared/postOffice/router';
+import { sendToPostOffice } from '../../shared/postOffice/postman';
 import { crawlSearch } from '../../shared/crawlSearch';
 import { logger } from '../../shared/logger';
 

@@ -2,7 +2,7 @@
 
 import { defineNitroPlugin } from 'nitropack/runtime'
 import { logger } from '../utils/shared'
-import { postOffice } from '../utils/shared/postOffice/router';
+import { postOffice } from '../utils/shared/postOffice/postman';
 import { prepMediaLetterbox } from '../utils/prep-media/letterbox';
 import { aiServiceLetterbox } from '../utils/ai-service/letterbox';
 import { analyseMediaLetterbox } from '../utils/analyse-media/letterbox';

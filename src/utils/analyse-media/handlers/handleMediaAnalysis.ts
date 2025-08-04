@@ -1,6 +1,6 @@
 import { logger } from '../../shared/logger';
 import { buildAnalysisPrompt } from '../handlers/buildAnalysisPrompts';
-import { sendToPostOffice } from '../../shared/postOffice/router';
+import { sendToPostOffice } from '../../shared/postOffice/postman';
 import { getBlobJson } from '../../shared/azureBlob';
 import type { AnalyseMediaJob } from '../../shared/types';
 
