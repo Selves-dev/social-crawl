@@ -120,7 +120,8 @@ export async function handleDownload(blobId: string, mediaUrl: string, blobServi
   const audioSasUrl = await generateBlobSasUrl(audioBlob);
   return {
     video: videoSasUrl,
-    audio: audioSasUrl
+    audio: audioSasUrl,
+    tmpCompressedPath
   };
 }
 
@@ -130,7 +131,13 @@ export async function handleDownloadThumbnail(blobId: string, thumbUrl: string, 
   }
   const finalThumbBlobName = `${blobId}-thumbnail.jpg`;
   const thumbBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(finalThumbBlobName);
-  const response = await axios.get(thumbUrl, { responseType: 'stream' });
+  const response = await axios.get(thumbUrl, {
+    responseType: 'stream',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+      'Referer': 'https://www.tiktok.com/'
+    }
+  });
   await thumbBlob.uploadStream(response.data);
   // Generate SAS token for thumbnail blob
   const thumbSasUrl = await generateBlobSasUrl(thumbBlob);

@@ -1,7 +1,7 @@
 import { defineEventHandler, readBody, sendError, createError } from 'h3'
 import { AIQueueMessage } from '../utils/ai-service/types/types'
 import { WorkflowContext } from '../utils/shared/workflow'
-import { sendPostmanMessage } from '../utils/shared/serviceBus'
+import { sendToPostOffice } from '../utils/shared/postOffice/router'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
     // ...existing code...
 
     // Send a postman message with util and type at the top level for generic routing
-    await sendPostmanMessage({
+    await sendToPostOffice({
       util: 'find-location',
       payload: {
         type: body.type || 'find-location-request',

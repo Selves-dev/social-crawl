@@ -1,6 +1,5 @@
 
 import { AIQueueMessage } from './types/types'
-import { ensureAIServiceQueueRunning, shutdownAIServiceQueueIfIdle } from './letterbox'
 import { v4 as uuidv4 } from 'uuid'
 import { serviceBus } from '../shared/serviceBus'
 import { logger } from '../shared/logger'
@@ -11,11 +10,9 @@ import { ServiceBusReceiver, ServiceBusSender, ServiceBusReceivedMessage } from 
  */
 export async function enqueueAIRequest(msg: AIQueueMessage): Promise<void> {
   logger.info('enqueueAIRequest called', { prompt: msg.prompt, modelType: msg.modelType })
-  // Ensure the queue is running before enqueueing
-  await ensureAIServiceQueueRunning()
   // Wrap the AIQueueMessage in a job envelope for the queue
   const job = {
-    id: uuidv4(),
+    id: `ai_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
     type: 'generic_ai' as const,
     inputData: msg,
     parameters: msg.options,
@@ -152,8 +149,8 @@ export class AIServiceThrottleQueue {
         if (!handler) throw new Error(`No handler for modelType: ${msg.modelType}`)
         const result = await handler(msg)
         // Pass result to Postman using msg.responseHandler
-        const { sendPostmanMessage } = await import('../shared/serviceBus')
-        await sendPostmanMessage({
+        const { sendToPostOffice } = await import('../shared/serviceBus')
+        await sendToPostOffice({
           type: 'ai_response',
           context: msg.workflow,
           payload: {
@@ -167,14 +164,6 @@ export class AIServiceThrottleQueue {
           jobId: job.id,
           modelType: msg.modelType
         })
-        // Auto-shutdown if queue is empty
-        if (this.receiver) {
-          const checkIsEmpty = async () => {
-            const peeked = await this.receiver!.peekMessages(1)
-            return peeked.length === 0
-          }
-          shutdownAIServiceQueueIfIdle(checkIsEmpty)
-        }
         return
       }
       // ...existing code for other job types...

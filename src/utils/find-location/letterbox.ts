@@ -3,29 +3,34 @@ import { handleLocationRequest, handleLocationResponse } from './handlers/handle
 import { logger } from '../shared/logger'
 
 /**
- * General letterbox entry point for all find-location messages.
- * Postman should call this with the message and context.
+ * Find-Location Letterbox - Internal Office Mail Handler
+ * 
+ * Receives mail from PostOffice and handles internal routing within the post office.
+ * Puts messages in appropriate internal trays and processes them.
  */
-export const findLocationLetterbox: LetterboxHandler = async (message) => {
-  console.info('[find-location.letterbox] Incoming message:', message);
-  console.info('[find-location.letterbox] Workflow context:', message.workflow);
-  console.info('[find-location.letterbox] batchId:', message.workflow?.batchId);
-  if (message.type === 'find-location-request') {
-    console.info('[find-location.letterbox] Passing workflow to handleLocationRequest:', message.workflow);
-    console.info('[find-location.letterbox] batchId to handleLocationRequest:', message.workflow?.batchId);
-    return handleLocationRequest(message.workflow);
-  }
-  const workflowContext = message.workflow;
-  if (!workflowContext) {
+const findLocationLetterbox: LetterboxHandler = async (message) => {
+  // Expect standardized shape: { util, type, workflow, payload }
+  const { util, type, workflow, payload } = message;
+
+  if (!workflow) {
+    logger.error('[find-location letterbox] Missing workflow context');
     throw new Error('[find-location letterbox] Missing workflow context');
   }
-  console.info('[find-location.letterbox] Passing workflow to handleLocationResponse:', workflowContext);
-  console.info('[find-location.letterbox] batchId to handleLocationResponse:', workflowContext?.batchId);
-  switch (message.type) {
-    case 'find-location-response':
-      return handleLocationResponse(message, workflowContext);
+
+  // Handle internal office routing - call appropriate handlers directly
+  switch (type) {
+    case 'find-location-request': {
+      const result = await handleLocationRequest(workflow);
+      return result;
+    }
+    case 'find-location-response': {
+      const result = await handleLocationResponse(payload, workflow);
+      return result;
+    }
     default:
-      logger.warn(`[Location-Finder] Unknown message type: ${message.type}`, { message });
-      return { error: 'Unknown message type', type: message.type };
+      logger.warn(`[find-location letterbox] Unknown message type: ${type}`);
+      return { error: 'Unknown message type', type };
   }
 }
+
+export { findLocationLetterbox };

@@ -1,9 +1,10 @@
 import { logger } from '../../shared/logger';
 import { buildAnalysisPrompt } from '../handlers/buildAnalysisPrompts';
-import { sendPostmanMessage } from '../../shared/serviceBus';
+import { sendToPostOffice } from '../../shared/postOffice/router';
 import { getBlobJson } from '../../shared/azureBlob';
+import type { AnalyseMediaJob } from '../../shared/types';
 
-export async function handleAnalyseMedia(message: any) {
+export async function handleAnalyseMedia(message: AnalyseMediaJob) {
   logger.info('handleAnalyseMedia called', { message });
 
   // Ensure workflow and mediaUrl are defined
@@ -29,7 +30,7 @@ export async function handleAnalyseMedia(message: any) {
   const postmanPayload = {
     util: 'ai-service',
     type: 'text-image',
-    context: workflow,
+    workflow,
     payload: {
       prompt,
       mediaUrl: message.blobUrl,
@@ -40,7 +41,7 @@ export async function handleAnalyseMedia(message: any) {
     }
   };
   logger.info('[handleAnalyseMedia] Full postman payload:', postmanPayload);
-  // Send to ai-service via postman (image/text only)
-  await sendPostmanMessage(postmanPayload);
-  logger.info('Sent image/text analysis job to ai-service via postman');
+  // Send to ai-service via postal system (image/text only)
+  await sendToPostOffice(postmanPayload);
+  logger.info('Sent image/text analysis job to ai-service via postal system');
 }

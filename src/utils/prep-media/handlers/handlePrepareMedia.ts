@@ -9,12 +9,13 @@ import * as os from 'os';
 
 import { extractVideoSegments, handleStoryboard } from './handleStoryboard';
 import { handleDownload, handleDownloadThumbnail } from './handleDownload';
-import { sendPostmanMessage, analyseMediaQueueName } from '../../shared/serviceBus';
+import { sendToPostOffice } from '../../shared/postOffice/router';
 
 export async function handlePrepareMedia(message: any) {
   logger.info('handlePrepareMedia called', { message });
 
-  const { workflow, blobUrl } = message;
+  const { workflow, payload } = message;
+  const blobUrl = payload?.blobUrl;
 
   // 1. Fetch JSON object from blob
   let blobJson: BlobManifest;
@@ -52,7 +53,7 @@ export async function handlePrepareMedia(message: any) {
   const baseFolder = `${platform}/json/${id}`;
 
   // 2. Download video and audio, upload to blob
-  let tmpVideoPath = path.join(os.tmpdir(), `${blobJson.id}-video.mp4`);
+  let tmpVideoPath = path.join(os.tmpdir(), `${id}-video.mp4`);
   try {
     if (!blobJson.link) {
       logger.error('No video link found in blobJson');
@@ -65,6 +66,11 @@ export async function handlePrepareMedia(message: any) {
     media.push({ type: 'video', url: downloadResults.video });
     media.push({ type: 'audio', url: downloadResults.audio });
     logger.info('Downloaded and uploaded media', { video: downloadResults.video, audio: downloadResults.audio });
+    // If you have a compressed video, update tmpVideoPath to point to it before storyboard extraction
+    if (downloadResults.tmpCompressedPath) {
+      tmpVideoPath = downloadResults.tmpCompressedPath;
+      logger.info('Updated tmpVideoPath to compressed video', { tmpVideoPath });
+    }
   } catch (err) {
     logger.error('Failed to download and upload media', err instanceof Error ? err : new Error(String(err)));
     return;
@@ -94,7 +100,9 @@ export async function handlePrepareMedia(message: any) {
   // 4. Download thumbnail from the URL by streaming to blob
   try {
     const thumbUrl = blobJson.thumbnail || blobJson.thumbnailUrl || message.thumbnailUrl;
+    // ...no thumbnail logging before download...
     if (thumbUrl) {
+      logger.info('Getting thumbnail from URL', { thumbUrl });
       const thumbTimestamp = new Date().toISOString().replace(/[-:.TZ]/g, "");
       const thumbAssetName = `${baseFolder}/${platform}-${id}-${thumbTimestamp}-thumbnail.jpg`;
       const thumbnailUrl = await handleDownloadThumbnail(thumbAssetName, thumbUrl, blobServiceClient, mediaContainerName);
@@ -122,14 +130,15 @@ export async function handlePrepareMedia(message: any) {
     if (workflow) {
       const outgoingMessage = {
         util: 'analyse-media',
-        context: workflow,
+        type: 'analyse-media-queued',
+        workflow,
         payload: {
           blobUrl
         }
       };
-      logger.info('[handlePrepareMedia] Sending to postman', { outgoingMessage });
-      await sendPostmanMessage(outgoingMessage);
-      logger.info('[handlePrepareMedia] Routed to analyse-media', { blobUrl, context: workflow });
+      logger.info('[handlePrepareMedia] Sending to postal system', { outgoingMessage });
+      await sendToPostOffice(outgoingMessage);
+      logger.info('[handlePrepareMedia] Routed to analyse-media', { blobUrl, workflow });
     } else {
       logger.warn('No workflow context for analyse-media routing');
     }

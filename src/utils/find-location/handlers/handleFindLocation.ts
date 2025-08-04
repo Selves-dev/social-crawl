@@ -1,5 +1,5 @@
 import { logger } from '../../shared/logger'
-import { sendPostmanMessage } from '../../shared/serviceBus'
+import { sendToPostOffice } from '../../shared/postOffice/router'
 import { db } from '../../shared/database'
 import { upsertLocationData } from './handleLocationData'
 // Location-Finder: Handlers only (letterbox is in letterbox.ts)
@@ -15,18 +15,17 @@ export async function handleLocationRequest(workflowContext: any) {
   // Build the full prompt using live crawl data
   const { buildLocationInstruction } = await import('./buildLocationPrompt');
   const prompt = await buildLocationInstruction();
-  // Send message to ai-service letterbox
-  await sendPostmanMessage({
+  // Send message to ai-service letterbox using standardized shape
+  await sendToPostOffice({
     util: 'ai-service',
+    type: 'ai_request',
+    workflow: workflowContext,
     payload: {
-      type: 'ai_request',
       prompt,
-      workflow: workflowContext,
       responseHandler: { util: 'find-location', type: 'find-location-response' },
       options: { maxTokens: 512 }
     }
   });
-  
   return { status: 'ai-request-enqueued', prompt };
 }
 
@@ -41,6 +40,8 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: a
   logger.info('[handleLocationResponse] Received workflowContext:', workflowContext);
   logger.info('[handleLocationResponse] batchId:', workflowContext?.batchId);
   
+  logger.info('[handleLocationResponse] Raw aiResponse received', { aiResponse });
+
   let parsedAiContent: any = null;
   let locationName: string = 'Unknown location';
   let countryCode: string = 'Unknown';
@@ -48,21 +49,25 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: a
 
   try {
     // Step 1: Parse the 'text' field from the aiResponse, which contains the AI's JSON output
-    // Ensure aiResponse.text exists and is a string before parsing
-    if (aiResponse?.text && typeof aiResponse.text === 'string') {
-      parsedAiContent = JSON.parse(aiResponse.text);
+    // The actual text is in aiResponse.response.text, not aiResponse.text
+    const responseText = aiResponse?.response?.text || aiResponse?.text;
+    logger.info('[handleLocationResponse] Parsing AI response text', { responseText });
+    if (responseText && typeof responseText === 'string') {
+      parsedAiContent = JSON.parse(responseText);
+      logger.info('[handleLocationResponse] Parsed AI content', { parsedAiContent });
 
       locationName = parsedAiContent.l; 
       countryCode = parsedAiContent.cc;
       queries = parsedAiContent.queries;
 
+      logger.info('[handleLocationResponse] Extracted location details', { locationName, countryCode, queries });
     } else {
-      logger.warn('AI response text field is missing or not a string, cannot parse location details.', { aiResponse });
+      logger.warn('[handleLocationResponse] AI response text field is missing or not a string, cannot parse location details.', { aiResponse });
     }
   } catch (error) {
-    logger.error(`Failed to parse AI response text: ${error instanceof Error ? error.message : String(error)}`);
-    logger.warn('Raw AI response text for failed parse', {
-      text: aiResponse?.text,
+    logger.error(`[handleLocationResponse] Failed to parse AI response text: ${error instanceof Error ? error.message : String(error)}`);
+    logger.warn('[handleLocationResponse] Raw AI response text for failed parse', {
+      text: aiResponse?.response?.text || aiResponse?.text,
       service: 'find-location'
     });
     // Fallback if parsing fails
@@ -71,48 +76,41 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: a
 
   // Persist location details to the database using abstraction
   try {
+    logger.info('[handleLocationResponse] Upserting location data to database', { location: locationName, countryCode, queries });
     await upsertLocationData({
       location: locationName,
       countryCode,
       queries
     });
-    logger.info('Location upserted in database', { location: locationName, countryCode });
+    logger.info('[handleLocationResponse] Location upserted in database', { location: locationName, countryCode });
   } catch (err) {
-    logger.error('Failed to persist location to database', err instanceof Error ? err : undefined);
+    logger.error('[handleLocationResponse] Failed to persist location to database', err instanceof Error ? err : undefined);
   }
 
   // Only send the first query as a message to the post-office for crawl-media
   if (Array.isArray(queries) && queries.length > 0 && locationName && countryCode) {
     const query = queries[0];
+    logger.info('[handleLocationResponse] Preparing to send search-crawl job', { locationName, countryCode, query });
     if (!query.includes('google.com')) {
-      logger.info('[handleLocationResponse] Creating search-crawl job envelope with workflowContext:', workflowContext);
-      logger.info('[handleLocationResponse] batchId for job envelope:', workflowContext?.batchId);
-      await sendPostmanMessage({
-        util: 'crawl-media',
-        context: workflowContext,
+      logger.info('[handleLocationResponse] Creating get-media job', { workflowContext, batchId: workflowContext?.batchId });
+      await sendToPostOffice({
+        util: 'get-media',
+        type: 'search-list',
+        workflow: workflowContext,
         payload: {
-          type: 'search-crawl-queued',
-          jobsQueued: [{
-            type: 'search-crawl-queued',
-            context: {
-              location: locationName,
-              countryCode,
-              query,
-              // add other context fields as needed
-            },
-            workflow: workflowContext,
-            meta: {
-              source: 'find-location',
-              timestamp: new Date().toISOString()
-            }
-          }]
+          location: locationName,
+          countryCode,
+          query,
+          meta: {
+            source: 'find-location',
+            timestamp: new Date().toISOString()
+          }
         }
       });
-      logger.info('Sent search-crawl request to post-office', { location: locationName, countryCode, query });
-      logger.info('[handleLocationResponse] Sent job envelope with workflowContext:', workflowContext);
-      logger.info('[handleLocationResponse] batchId sent:', workflowContext?.batchId);
+      logger.info('[handleLocationResponse] Sent get-media job to post-office', { location: locationName, countryCode, query });
+      logger.info('[handleLocationResponse] Sent job envelope', { workflowContext, batchId: workflowContext?.batchId });
     } else {
-      logger.info('Skipped sending search-crawl job for google.com query', { query });
+      logger.info('[handleLocationResponse] Skipped sending search-crawl job for google.com query', { query });
     }
   }
 

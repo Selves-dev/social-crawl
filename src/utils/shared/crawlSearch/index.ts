@@ -107,10 +107,10 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
 
 // Fetch and parse with ScrapeNinja RapidAPI
 export async function fetchWithRapidApi(url: string): Promise<any> {
-  const rapidApiKey = process.env.RAPIDAPI_KEY;
+  const rapidApiKey = process.env["rapidapi-key"];
   if (!rapidApiKey) {
-    console.error('[fetchWithRapidApi] RAPIDAPI_KEY is not set in environment variables.');
-    throw new Error('RAPIDAPI_KEY is not set in environment variables.');
+    console.error('[fetchWithRapidApi] RAPID-API-KEY is not set in environment variables.');
+    throw new Error('RAPID-API-KEY is not set in environment variables.');
   }
   const endpoint = 'https://scrapeninja.p.rapidapi.com/scrape';
   // console.log(`[fetchWithRapidApi] Fetching URL: ${url}`);

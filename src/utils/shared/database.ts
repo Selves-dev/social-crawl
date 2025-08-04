@@ -53,9 +53,9 @@ class DatabaseManager {
    * Get database configuration from environment
    */
   private getConfig(): DatabaseConfig {
-    const uri = process.env["MONGODB-URI"]
+    const uri = process.env["mongodb-uri"]
     if (!uri) {
-      throw new Error('MONGODB-URI environment variable is required')
+      throw new Error('mongodb-uri environment variable is required')
     }
 
     // Extract database name from URI, with fallback

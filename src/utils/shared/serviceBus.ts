@@ -1,24 +1,7 @@
 /**
- * Send a message to the main postman queue
- */
-import { getSecurityManager } from './security'
-
-export async function sendPostmanMessage(message: any, queueName?: string): Promise<void> {
-  const sender = serviceBus.createQueueSender(queueName)
-  const security = getSecurityManager()
-  const applicationProperties = security.addMessageSecurity({
-    ...(message?.type && { type: message.type })
-  })
-  await sender.sendMessages({
-    body: message,
-    contentType: 'application/json',
-    messageId: message?.id || undefined,
-    applicationProperties
-  })
-}
-/**
- * Azure Service Bus Utilities (Basic Tier - Queue Only)
- * Handles Azure Service Bus connections and queue operations
+ * Azure Service Bus Client Manager
+ * Pure infrastructure layer - handles Azure Service Bus connections only
+ * No business logic or message routing
  */
 
 import { ServiceBusClient, ServiceBusReceiver, ServiceBusSender } from '@azure/service-bus'
@@ -37,7 +20,7 @@ class ServiceBusManager {
 
   async connect(config: ServiceBusConfig): Promise<void> {
     try {
-      logger.info('Connecting to postman (Azure Service Bus)...', { service: 'postman' })
+      logger.info('Connecting to Azure Service Bus...', { service: 'service-bus' })
       
       this.config = config
       this.client = new ServiceBusClient(config.connectionString)
@@ -46,13 +29,13 @@ class ServiceBusManager {
       const testSender = this.client.createSender(config.queueName)
       await testSender.close()
       
-      logger.info('✅ Postman connection established', { 
-        service: 'postman',
+      logger.info('✅ Service Bus connection established', { 
+        service: 'service-bus',
         queueName: config.queueName,
         tier: 'Basic'
       })
     } catch (error) {
-      logger.error('❌ Failed to connect to postman', error as Error, { service: 'postman' })
+      logger.error('❌ Failed to connect to Service Bus', error as Error, { service: 'service-bus' })
       throw error
     }
   }
@@ -62,7 +45,7 @@ class ServiceBusManager {
       await this.client.close()
       this.client = null
       this.config = null
-      logger.info('Postman connection closed', { service: 'postman' })
+      logger.info('Service Bus connection closed', { service: 'service-bus' })
     }
   }
 
@@ -102,8 +85,8 @@ export const serviceBus = new ServiceBusManager()
 
 // Helper function to get config from environment variables
 export function getServiceBusConfigFromEnv(): ServiceBusConfig {
-  const connectionString = process.env["AZURE-SERVICE-BUS-CONNECTION-STRING"]
-  const queueName = process.env["ASB-POST-OFFICE-QUEUE"]
+  const connectionString = process.env["azure-service-bus-connection-string"]
+  const queueName = process.env["asb-post-office-queue"]  // Always post-office queue
   
   if (!connectionString) {
     throw new Error('AZURE-SERVICE-BUS-CONNECTION-STRING environment variable is required')
@@ -116,13 +99,11 @@ export function getServiceBusConfigFromEnv(): ServiceBusConfig {
   return {
     connectionString,
     queueName,
-    maxConcurrentCalls: process.env["ASB-MAX-CONCURRENT-CALLS"] 
-      ? parseInt(process.env["ASB-MAX-CONCURRENT-CALLS"], 10) 
+    maxConcurrentCalls: process.env["asb-max-concurrent-calls"] 
+      ? parseInt(process.env["asb-max-concurrent-calls"], 10) 
       : 10,
-    maxAutoRenewDurationMinutes: process.env["ASB-MAX-AUTO-RENEW-DURATION-MINUTES"]
-      ? parseInt(process.env["ASB-MAX-AUTO-RENEW-DURATION-MINUTES"], 10)
+    maxAutoRenewDurationMinutes: process.env["asb-max-auto-renew-duration-minutes"]
+      ? parseInt(process.env["asb-max-auto-renew-duration-minutes"], 10)
       : 5
   }
 }
-
-export const analyseMediaQueueName = process.env["ASB-ANALYSE-MEDIA-QUEUE"] || 'analyse-media';

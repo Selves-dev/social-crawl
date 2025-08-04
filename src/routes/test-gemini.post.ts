@@ -1,5 +1,5 @@
 
-import { sendPostmanMessage } from '../utils/shared/serviceBus';
+import { sendToPostOffice } from '../utils/shared/postOffice/router';
 import { defineEventHandler, readBody } from 'h3';
 
 export default defineEventHandler(async (event) => {
@@ -17,6 +17,6 @@ export default defineEventHandler(async (event) => {
     }
   };
   // Send to postman (service bus)
-  const result = await sendPostmanMessage(postmanMessage);
+  const result = await sendToPostOffice(postmanMessage);
   return result;
 });

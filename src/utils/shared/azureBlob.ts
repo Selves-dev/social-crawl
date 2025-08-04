@@ -24,7 +24,7 @@ export async function updateBlobJson(blobUrl: string, updateFn: (data: any) => a
   console.log('[updateBlobJson] Container:', containerName, 'Blob:', blobName);
   const blobServiceClient = getBlobServiceClient();
   if (!blobServiceClient) throw new Error('Missing Azure Storage connection string');
-  console.log('[updateBlobJson] Using connection string:', process.env.AZURE_STORAGE_CONNECTION_STRING ? process.env.AZURE_STORAGE_CONNECTION_STRING.slice(0, 20) + '...' : 'undefined');
+  console.log('[updateBlobJson] Using connection string:', process.env["azure-storage-connection-string"] ? process.env["azure-storage-connection-string"].slice(0, 20) + '...' : 'undefined');
   const container = blobServiceClient.getContainerClient(containerName);
   const blob = container.getBlockBlobClient(blobName);
   await blob.upload(JSON.stringify(updatedJson), Buffer.byteLength(JSON.stringify(updatedJson)), { blobHTTPHeaders: { blobContentType: 'application/json' } });
@@ -33,7 +33,7 @@ export async function updateBlobJson(blobUrl: string, updateFn: (data: any) => a
 // ...existing code...
 
 export function getBlobServiceClient(): BlobServiceClient | null {
-  const connectionString = process.env["AZURE_STORAGE_CONNECTION_STRING"];
+  const connectionString = process.env["azure-storage-connection-string"];
   if (!connectionString) {
     // Optionally log error here, or let caller handle
     return null;
@@ -68,7 +68,7 @@ import { BlobServiceClient } from '@azure/storage-blob';
  * Uploads a JSON object to Azure Blob Storage
  */
 export async function uploadJsonToBlob(containerName: string, blobName: string, data: any): Promise<string> {
-  const connectionString = process.env["AZURE_STORAGE_CONNECTION_STRING"];
+  const connectionString = process.env["azure-storage-connection-string"];
   if (!connectionString) throw new Error('Missing Azure Storage connection string');
   const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
   const containerClient = blobServiceClient.getContainerClient(containerName);
@@ -93,7 +93,7 @@ export async function getBlobJson(blobUrl: string): Promise<any> {
   const blobName = matches[2];
 
   // Get connection string from env
-  const connectionString = process.env["AZURE_STORAGE_CONNECTION_STRING"];
+  const connectionString = process.env["azure-storage-connection-string"];
   if (!connectionString) throw new Error('Missing Azure Storage connection string');
 
   // Create blob client

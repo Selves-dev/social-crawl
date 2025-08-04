@@ -19,8 +19,8 @@ export class PrepMediaThrottleQueue {
   private readonly maxConcurrentJobs: number
 
   constructor() {
-    this.queueName = process.env["ASB-PREP-MEDIA-QUEUE"] || 'prep-media';
-    this.maxConcurrentJobs = parseInt(process.env["PREP-MEDIA-MAX-CONCURRENT-JOBS"] || '2', 10);
+    this.queueName = process.env["asb-prep-media-queue"] || 'prep-media';
+    this.maxConcurrentJobs = parseInt(process.env["prep-media-max-concurrent-jobs"] || '2', 10);
   }
 
   async initialize(): Promise<void> {

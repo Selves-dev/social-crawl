@@ -21,18 +21,51 @@ DOCKERFILE_PATH="$BUILD_DIR/Dockerfile"
 
 # If .env.secrets exists, append its contents to .env (secrets take precedence)
 
-# Step: Sync secrets from .env.secrets to Azure Key Vault
+
+
+
+# Step: Upload .env.secrets as a file to the container and set env var references
 if [[ -f ".env.secrets" ]]; then
-  echo -e "${BLUE}🔐 Syncing secrets from .env.secrets to Azure Key Vault (always updating)...${NC}"
+  echo -e "${BLUE}🔐 Syncing secrets from .env.secrets to Azure Container App as container app secrets...${NC}"
+  SECRET_ARGS=()
+  SECRET_ENV_VARS=()
   while IFS='=' read -r key value; do
     [[ -z "$key" || "$key" =~ ^# ]] && continue
-    key=$(echo "$key" | xargs)
+    key=$(echo "$key" | xargs | tr '[:upper:]' '[:lower:]' | tr '_' '-')
     value=$(echo "$value" | xargs)
-    key_dash=$(echo "$key" | tr '_' '-')
-    echo -e "${BLUE}� Setting secret '$key_dash' in Key Vault${NC}"
-    az keyvault secret set --vault-name "social-crawl-va" --name "$key_dash" --value "$value"
+    SECRET_ARGS+=("$key=$value")
+    SECRET_ENV_VARS+=("$key=secretref:$key")
   done < ".env.secrets"
-  echo -e "${GREEN}✅ .env.secrets synced to Azure Key Vault (all secrets updated).${NC}"
+  if (( ${#SECRET_ARGS[@]} > 0 )); then
+    echo -e "${BLUE}🔑 Registering container app secrets: ${SECRET_ARGS[*]}${NC}"
+    az containerapp secret set --name "social-crawl" --resource-group "social-crawl-rg" --secrets "${SECRET_ARGS[@]}"
+  fi
+  if (( ${#SECRET_ENV_VARS[@]} > 0 )); then
+    echo -e "${BLUE}🔄 Injecting container app secrets as env vars: ${SECRET_ENV_VARS[*]}${NC}"
+    az containerapp update --name "social-crawl" --resource-group "social-crawl-rg" --set-env-vars "${SECRET_ENV_VARS[@]}"
+  fi
+  echo -e "${YELLOW}⚠️  To mount .env.secrets as a file, configure a secret volume in your container app definition.${NC}"
+  echo -e "${GREEN}✅ .env.secrets synced to Azure Container App as container app secrets and env vars.${NC}"
+fi
+
+# Step: Upload standard env vars from .env as name=value pairs (excluding secrets)
+if [[ -f "$ENV_FILE" ]]; then
+  echo -e "${BLUE}🔄 Syncing standard env vars from $ENV_FILE to Azure Container App...${NC}"
+  STD_ENV_VARS=()
+  while IFS='=' read -r key value; do
+    [[ -z "$key" || "$key" =~ ^# ]] && continue
+    key=$(echo "$key" | xargs | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+    value=$(echo "$value" | xargs)
+    # Only add if not already a secretref (avoid overwriting secret envs)
+    if ! grep -q "^$key=" .env.secrets 2>/dev/null; then
+      STD_ENV_VARS+=("$key=$value")
+    fi
+  done < "$ENV_FILE"
+  if (( ${#STD_ENV_VARS[@]} > 0 )); then
+    echo -e "${BLUE}🔄 Injecting standard env vars: ${STD_ENV_VARS[*]}${NC}"
+    az containerapp update --name "social-crawl" --resource-group "social-crawl-rg" --set-env-vars "${STD_ENV_VARS[@]}"
+  fi
+  echo -e "${GREEN}✅ Standard env vars from $ENV_FILE synced to Azure Container App.${NC}"
 fi
 
 if [[ ! -f "$ENV_FILE" ]]; then
@@ -52,21 +85,12 @@ echo -e "${GREEN}✅ Docker image built and pushed for linux/amd64.${NC}"
 
 # Step 4: Update Azure Container App with new image
 
-# Step 4a: Update Azure Container App with new image
+# Step 4: Update Azure Container App with new image
 az containerapp update \
   --name "social-crawl" \
   --resource-group "social-crawl-rg" \
   --image "$LATEST_TAG"
 echo -e "${GREEN}✅ Azure Container App updated with new image.${NC}"
-
-# Step 4b: Update Azure Container App environment variables from .env
-echo -e "${BLUE}🔄 Updating Azure Container App environment variables from .env...${NC}"
-ENV_STRING=$(bash scripts/env-to-azure-string.sh)
-az containerapp update \
-  --name "social-crawl" \
-  --resource-group "social-crawl-rg" \
-  --set-env-vars $ENV_STRING
-echo -e "${GREEN}✅ Azure Container App environment variables updated from .env.${NC}"
 
 # Step 5: Output health check URL
 APP_URL=$(az containerapp show --name "social-crawl" --resource-group "social-crawl-rg" --query properties.configuration.ingress.fqdn -o tsv)

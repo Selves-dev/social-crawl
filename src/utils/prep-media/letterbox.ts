@@ -1,46 +1,27 @@
 import type { LetterboxHandler } from '../shared/letterboxTypes';
-
-import { QueueManager } from '../shared/index';
 import { handlePrepareMedia } from './handlers/handlePrepareMedia';
 import { logger } from '../shared/logger';
-import { sendPostmanMessage } from '../shared/serviceBus';
 
 /**
- * Ensures the prep-media queue is started before enqueueing a request.
+ * Prep-Media Letterbox - Internal Office Mail Handler
+ * 
+ * Receives prep requests from PostOffice and handles them within the office.
+ * Directly processes preparation requests and returns results.
  */
-export async function ensurePrepMediaQueueRunning() {
-  await QueueManager.startPrepMediaProcessing();
-}
-
-/**
- * Attempts to stop the prep-media queue if it is empty, with a small delay to avoid rapid cycling.
- * You should call this after processing a job.
- */
-export async function shutdownPrepMediaQueueIfIdle(checkIsEmpty: () => Promise<boolean>, delayMs = 2000) {
-  setTimeout(async () => {
-    if (await checkIsEmpty()) {
-      await QueueManager.stopPrepMediaProcessing();
-    }
-  }, delayMs);
-}
-export const prepMediaLetterbox: LetterboxHandler = async (message) => {
-  if (!message) {
-    logger.error('[prep-media letterbox] Message is undefined or null');
-    return { error: 'Message is undefined or null' };
-  }
-  if (!message.workflow) {
+const prepMediaLetterbox: LetterboxHandler = async (message) => {
+  logger.info('[prep-media letterbox] Processing prep request in office', { message });
+  // Expect standardized shape: { util, type, workflow, payload }
+  const { util, type, workflow, payload } = message;
+  
+  if (!workflow) {
+    logger.error('[prep-media letterbox] Missing workflow context in message');
     throw new Error('[prep-media letterbox] Missing workflow context in message');
   }
-  // Always process as prep-media job
-  const prepResult = await handlePrepareMedia(message);
-  // Optionally route to next handler or send postman message here
-  // Example: sendPostmanMessage({ util: 'next-util', payload: { ... } });
+  
+  // Handle prep-media processing directly in the office
+  const prepResult = await handlePrepareMedia({ util, type, workflow, payload });
+  
   return { status: 'prep-media-processed', prepResult };
-}
-prepMediaLetterbox.initializeQueue = async () => {
-  await QueueManager.startPrepMediaProcessing();
 };
 
-prepMediaLetterbox.shutdownQueue = async () => {
-  await QueueManager.stopPrepMediaProcessing();
-};
+export { prepMediaLetterbox };

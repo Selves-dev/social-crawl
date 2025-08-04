@@ -1,6 +1,7 @@
 
 import { logger } from '../../shared/logger';
-import { sendPostmanMessage } from '../../shared/serviceBus';
+import { getBlobJson } from '../../shared/azureBlob';
+import { sendToPostOffice } from '../../shared/postOffice/router';
 import { buildVenueBasicsPrompt } from './buildAnalysisPrompts';
 
 
@@ -14,12 +15,12 @@ export async function handleVenueBasics(message: any): Promise<any> {
   const prompt = buildVenueBasicsPrompt(message);
   logger.info('[handleVenueBasics] Built prompt for search service:', { prompt });
   // Send to search service (ai-service) for further enrichment
-  await sendPostmanMessage({
+  await sendToPostOffice({
     util: 'ai-service',
     type: 'search',
+    workflow: message.workflow,
     payload: {
       prompt,
-      workflow: message.workflow,
       responseHandler: {
         util: 'analyse-media',
         type: 'ai_SearchResponse'
