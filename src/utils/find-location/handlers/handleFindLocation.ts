@@ -51,7 +51,7 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: a
     let countryCode = '';
     let queries: string[] = [];
     const text = aiResponse?.result?.text;
-    logger.info('[location-response] Parsing AI response text', { text });
+    logger.debug('[location-response] Parsing AI response text', { text });
     
     if (text && typeof text === 'string') {
       // Remove code block markers (handles ```json and ```)
@@ -93,13 +93,11 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: a
         countryCode, 
         queries 
       });
-      
       await upsertLocationData({
         location: locationName,
         countryCode,
         queries
       });
-      
       logger.info('[location-response] Location upserted in database', { 
         location: locationName, 
         countryCode 
@@ -110,22 +108,27 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: a
       );
     }
 
+    // Add l, cc, w to workflowContext for downstream jobs
+    workflowContext = {
+      ...workflowContext,
+      l: locationName,
+      cc: countryCode,
+      w: queries
+    };
+
     // Send the first query as a message to post-office for search-list
     if (Array.isArray(queries) && queries.length > 0 && locationName && countryCode) {
       const query = queries[0];
-      
       logger.debug('[location-response] Preparing to send search-list job', { 
         locationName, 
         countryCode, 
         query 
       });
-      
       if (!query.includes('google.com')) {
         logger.info('[location-response] Creating search-list job', { 
           workflowContext, 
           batchId: workflowContext?.batchId 
         });
-        
         await sendToPostOffice({
           util: 'get-media',
           type: 'search-list',
@@ -141,7 +144,6 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: a
             }
           }
         });
-        
         logger.info('[location-response] handleLocationResponse completed - job sent to search-list');
       } else {
         logger.info('[location-response] Skipped sending search-list job for google.com query', { 

@@ -9,7 +9,7 @@ import { logger } from '../shared/logger';
 // Function for PostOffice to deliver a message to the intray (enqueue to queue)
 export const aiServiceLetterbox: (message: PostOfficeMessage) => Promise<void> = async (message) => {
   const { util, type, workflow, payload } = message;
-  logger.info('[aiServiceLetterbox] Called with message', { util, type, workflow, payload });
+  logger.debug('[aiServiceLetterbox] Called with message', { util, type, workflow, payload });
   if (!workflow) {
     logger.error('[aiServiceLetterbox] Missing workflow context');
     throw new Error('[aiServiceLetterbox] Missing workflow context');
@@ -23,7 +23,7 @@ export const aiServiceLetterbox: (message: PostOfficeMessage) => Promise<void> =
 export function startAIServiceIntray() {
   logger.debug('[StartAIServiceIntray] Registering queue subscriber for aiServiceQueue');
   aiServiceQueue.subscribe(async (message: PostOfficeMessage) => {
-    logger.info('[AI-Service-Intray] Received message from queue', { type: message.type, workflow: message.workflow, payload: message.payload });
+    logger.debug('[AI-Service-Intray] Received message from queue', { type: message.type, workflow: message.workflow, payload: message.payload });
     const { type, workflow, payload } = message;
     if (!workflow) {
       logger.error('[AI-Service-Intray] Missing workflow context');
@@ -32,11 +32,11 @@ export function startAIServiceIntray() {
     let result;
     switch (type) {
       case 'text':
-        logger.info('[AI-Service-Intray] Routing to handleTextRequest');
+        logger.debug('[AI-Service-Intray] Routing to handleTextRequest');
         result = await handleTextRequest(message);
         break;
       case 'text-image':
-        logger.info('[AI-Service-Intray] Routing to handleTextImageRequest');
+        logger.debug('[AI-Service-Intray] Routing to handleTextImageRequest');
         result = await handleTextImageRequest(message);
         break;
       case 'search':
@@ -63,7 +63,8 @@ export function startAIServiceIntray() {
           result
         }
       });
-      logger.info('[AI-Service-Intray] Response sent to PostOffice', { workflow, result });
+      logger.info('[AI-Service-Intray] Response sent to PostOffice');
+      logger.debug('[AI-Service-Intray] Response sent to PostOffice', { workflow, result });
     } catch (err) {
       logger.error('[AI-Service-Intray] Failed to send response to PostOffice', err as Error, { workflow, result });
     }

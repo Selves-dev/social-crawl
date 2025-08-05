@@ -1,58 +1,203 @@
-export function getBlobName({ platform, type = 'json', id }: { platform: string; type?: string; id: string }): string {
+import { 
+  BlobServiceClient, 
+  BlobSASPermissions, 
+  generateBlobSASQueryParameters, 
+  SASProtocol, 
+  StorageSharedKeyCredential,
+  BlockBlobClient,
+  ContainerClient
+} from '@azure/storage-blob';
+
+// Types
+interface BlobUrlParts {
+  containerName: string;
+  blobName: string;
+  accountName?: string;
+}
+
+interface BlobNameOptions {
+  platform: string;
+  type?: string;
+  id: string;
+}
+
+// Constants
+const PLATFORM_PATTERNS = new Map([
+  [/instagram\.com/, 'instagram'],
+  [/tiktok\.com/, 'tiktok'],
+  [/youtube\.com/, 'youtube'],
+  [/google\./, 'google']
+]);
+
+const DEFAULT_SAS_EXPIRY_MINUTES = 60;
+const JSON_CONTENT_TYPE = 'application/json';
+
+// Logger utility
+import { logger } from './logger';
+function getLogger() {
+  return logger;
+}
+
+// Core Azure Blob Service
+class AzureBlobService {
+  private static client: BlobServiceClient | null = null;
+  
+  static getClient(): BlobServiceClient {
+    const connectionString = process.env["azure-storage-connection-string"];
+    if (!connectionString) {
+      throw new Error('Missing Azure Storage connection string');
+    }
+    
+    if (!this.client) {
+      this.client = BlobServiceClient.fromConnectionString(connectionString);
+    }
+    
+    return this.client;
+  }
+
+  static parseUrl(blobUrl: string): BlobUrlParts {
+    const url = new URL(blobUrl);
+    const matches = url.pathname.match(/^\/([^\/]+)\/(.+)$/);
+    
+    if (!matches) {
+      throw new Error('Invalid blob URL format');
+    }
+
+    const accountMatch = url.hostname.match(/^(.*?)\.blob\.core\.windows\.net$/);
+    
+    return {
+      containerName: matches[1],
+      blobName: matches[2],
+      accountName: accountMatch?.[1]
+    };
+  }
+
+  static getBlockBlobClient(containerName: string, blobName: string): BlockBlobClient {
+    return this.getClient()
+      .getContainerClient(containerName)
+      .getBlockBlobClient(blobName);
+  }
+}
+
+// Utility functions
+export function getBlobName({ platform, type = 'json', id }: BlobNameOptions): string {
   const timestamp = Date.now();
-  // Use the id as a directory, e.g. platform/type/id/timestamp.type
   return `${platform}/${type}/${id}/${timestamp}.${type}`;
 }
+
 export function getPlatform(link: string): string {
-  if (/instagram\.com/.test(link)) return 'instagram';
-  if (/tiktok\.com/.test(link)) return 'tiktok';
-  if (/youtube\.com/.test(link)) return 'youtube';
-  if (/google\./.test(link)) return 'google';
+  for (const [pattern, platform] of PLATFORM_PATTERNS) {
+    if (pattern.test(link)) return platform;
+  }
   return 'generic';
 }
-export async function updateBlobJson(blobUrl: string, updateFn: (data: any) => any): Promise<void> {
-  console.log('[updateBlobJson] Called with blobUrl:', blobUrl);
-  const blobJson = await getBlobJson(blobUrl);
-  console.log('[updateBlobJson] Fetched blob JSON:', blobJson);
-  const updatedJson = updateFn(blobJson);
-  console.log('[updateBlobJson] Updated JSON:', updatedJson);
-  const url = new URL(blobUrl);
-  const matches = url.pathname.match(/\/([^\/]+)\/(.+)$/);
-  if (!matches) throw new Error('Invalid blob URL');
-  const containerName = matches[1];
-  const blobName = matches[2];
-  console.log('[updateBlobJson] Container:', containerName, 'Blob:', blobName);
-  const blobServiceClient = getBlobServiceClient();
-  if (!blobServiceClient) throw new Error('Missing Azure Storage connection string');
-  console.log('[updateBlobJson] Using connection string:', process.env["azure-storage-connection-string"] ? process.env["azure-storage-connection-string"].slice(0, 20) + '...' : 'undefined');
-  const container = blobServiceClient.getContainerClient(containerName);
-  const blob = container.getBlockBlobClient(blobName);
-  await blob.upload(JSON.stringify(updatedJson), Buffer.byteLength(JSON.stringify(updatedJson)), { blobHTTPHeaders: { blobContentType: 'application/json' } });
-  console.log('[updateBlobJson] Uploaded updated JSON to blob:', blob.url);
-}
-// ...existing code...
 
-export function getBlobServiceClient(): BlobServiceClient | null {
-  const connectionString = process.env["azure-storage-connection-string"];
-  if (!connectionString) {
-    // Optionally log error here, or let caller handle
-    return null;
+// Stream helper
+async function streamToBuffer(readableStream: NodeJS.ReadableStream): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    
+    readableStream
+      .on('data', (data) => chunks.push(Buffer.from(data)))
+      .on('end', () => resolve(Buffer.concat(chunks)))
+      .on('error', reject);
+  });
+}
+
+// Main blob operations
+export async function uploadJsonToBlob(
+  containerName: string, 
+  blobName: string, 
+  data: any
+): Promise<string> {
+  const blobClient = AzureBlobService.getBlockBlobClient(containerName, blobName);
+  const jsonString = JSON.stringify(data);
+  
+  await blobClient.upload(jsonString, Buffer.byteLength(jsonString), {
+    blobHTTPHeaders: { blobContentType: JSON_CONTENT_TYPE }
+  });
+  
+  return blobClient.url;
+}
+
+export async function getBlobJson(blobUrl: string): Promise<any> {
+  const logger = getLogger();
+  
+  try {
+    const { containerName, blobName } = AzureBlobService.parseUrl(blobUrl);
+    const blobClient = AzureBlobService.getClient()
+      .getContainerClient(containerName)
+      .getBlobClient(blobName);
+
+    const response = await blobClient.download();
+    
+    if (!response.readableStreamBody) {
+      throw new Error('Blob has no readable stream body');
+    }
+    
+    const buffer = await streamToBuffer(response.readableStreamBody);
+    return JSON.parse(buffer.toString());
+    
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error('getBlobJson: Error fetching or parsing blob', err);
+    throw err;
   }
-  return BlobServiceClient.fromConnectionString(connectionString);
 }
-import { BlobSASPermissions, generateBlobSASQueryParameters, SASProtocol, StorageSharedKeyCredential } from '@azure/storage-blob';
 
-export async function generateBlobSasUrl(blobClient: any, expiryMinutes = 60): Promise<string> {
-  const urlParts = blobClient.url.match(/https:\/\/(.*?)\.blob\.core\.windows\.net\/(.*?)\/(.*)/);
-  if (!urlParts) throw new Error('Invalid blob URL');
-  const accountName = urlParts[1];
-  const containerName = urlParts[2];
-  const blobName = urlParts[3];
-  // You may need to get the account key from your blobServiceClient
+export async function updateBlobJson(
+  blobUrl: string, 
+  updateFn: (data: any) => any
+): Promise<void> {
+  const logger = getLogger();
+  logger.debug('[updateBlobJson] Called with blobUrl', { blobUrl });
+
+  try {
+    // Fetch current data
+    const blobJson = await getBlobJson(blobUrl);
+    logger.debug('[updateBlobJson] Fetched blob JSON', { blobJson });
+
+    // Apply update
+    const updatedJson = updateFn(blobJson);
+    logger.debug('[updateBlobJson] Updated JSON', { updatedJson });
+
+    // Parse URL and upload
+    const { containerName, blobName } = AzureBlobService.parseUrl(blobUrl);
+    logger.info('[updateBlobJson] Container and Blob', { containerName, blobName });
+
+    const blobClient = AzureBlobService.getBlockBlobClient(containerName, blobName);
+    const jsonString = JSON.stringify(updatedJson);
+    
+    await blobClient.upload(jsonString, Buffer.byteLength(jsonString), {
+      blobHTTPHeaders: { blobContentType: JSON_CONTENT_TYPE }
+    });
+    
+    logger.debug('[updateBlobJson] Uploaded updated JSON to blob', { url: blobClient.url });
+    
+  } catch (error) {
+    logger.error('[updateBlobJson] Failed to update blob', error);
+    throw error;
+  }
+}
+
+export async function generateBlobSasUrl(
+  blobClient: any, 
+  expiryMinutes = DEFAULT_SAS_EXPIRY_MINUTES
+): Promise<string> {
+  const { containerName, blobName, accountName } = AzureBlobService.parseUrl(blobClient.url);
+  
+  if (!accountName) {
+    throw new Error('Could not extract account name from blob URL');
+  }
+  
   const accountKey = blobClient.credential?.accountKey || blobClient?.accountKey;
-  if (!accountKey) throw new Error('Missing Azure Storage account key for SAS generation');
+  if (!accountKey) {
+    throw new Error('Missing Azure Storage account key for SAS generation');
+  }
+
   const sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
   const expiresOn = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
   const sasParams = generateBlobSASQueryParameters({
     containerName,
     blobName,
@@ -60,66 +205,15 @@ export async function generateBlobSasUrl(blobClient: any, expiryMinutes = 60): P
     expiresOn,
     protocol: SASProtocol.Https,
   }, sharedKeyCredential);
+
   return `${blobClient.url}?${sasParams.toString()}`;
 }
-// ...existing code...
-import { BlobServiceClient } from '@azure/storage-blob';
-/**
- * Uploads a JSON object to Azure Blob Storage
- */
-export async function uploadJsonToBlob(containerName: string, blobName: string, data: any): Promise<string> {
-  const connectionString = process.env["azure-storage-connection-string"];
-  if (!connectionString) throw new Error('Missing Azure Storage connection string');
-  const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
-  const containerClient = blobServiceClient.getContainerClient(containerName);
-  const blobClient = containerClient.getBlockBlobClient(blobName);
-  const jsonString = JSON.stringify(data);
-  await blobClient.upload(jsonString, Buffer.byteLength(jsonString), {
-    blobHTTPHeaders: { blobContentType: 'application/json' }
-  });
-  return blobClient.url;
-}
 
-/**
- * Fetches and parses a JSON object from an Azure Blob URL
- */
-export async function getBlobJson(blobUrl: string): Promise<any> {
-  // Parse the blob URL
-  const url = new URL(blobUrl);
-  // Match first segment as container, rest as blob name
-  const matches = url.pathname.match(/^\/([^\/]+)\/(.+)$/);
-  if (!matches) throw new Error('Invalid blob URL');
-  const containerName = matches[1];
-  const blobName = matches[2];
-
-  // Get connection string from env
-  const connectionString = process.env["azure-storage-connection-string"];
-  if (!connectionString) throw new Error('Missing Azure Storage connection string');
-
-  // Create blob client
-  const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
-  const containerClient = blobServiceClient.getContainerClient(containerName);
-  const blobClient = containerClient.getBlobClient(blobName);
-
-  // Download blob content
-  const downloadBlockBlobResponse = await blobClient.download();
-  if (!downloadBlockBlobResponse.readableStreamBody) {
-    throw new Error('Blob has no readable stream body');
+// Legacy compatibility
+export function getBlobServiceClient(): BlobServiceClient | null {
+  try {
+    return AzureBlobService.getClient();
+  } catch {
+    return null;
   }
-  const downloaded = await streamToBuffer(downloadBlockBlobResponse.readableStreamBody);
-  return JSON.parse(downloaded.toString());
-}
-
-// Helper to convert stream to buffer
-async function streamToBuffer(readableStream: NodeJS.ReadableStream): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    readableStream.on('data', (data) => {
-      chunks.push(Buffer.from(data));
-    });
-    readableStream.on('end', () => {
-      resolve(Buffer.concat(chunks));
-    });
-    readableStream.on('error', reject);
-  });
 }

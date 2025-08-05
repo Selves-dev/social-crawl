@@ -115,6 +115,6 @@ export interface Perspective {
   context: {
     l: string;
     cc: string;
-    w: string;
+    w: string[];
   };
 }

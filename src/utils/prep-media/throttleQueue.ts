@@ -50,7 +50,7 @@ export class PrepMediaThrottleQueue {
       applicationProperties
     });
 
-    logger.info(`Prep media job queued: ${messageId}`, {
+    logger.debug(`Prep media job queued: ${messageId}`, {
       service: 'prep-media',
       jobId: messageId,
       jobType: job.type

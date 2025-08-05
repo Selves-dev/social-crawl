@@ -1,12 +1,12 @@
 
 import { defineEventHandler, readBody, sendError, createError } from 'h3';
+import { requireAuth } from '../middleware/auth';
 import { WorkflowContext, WorkflowStage } from '../utils/ai-service/types/types';
 import { sendToPostOffice } from '../utils/shared/postOffice/postman';
 
 export default defineEventHandler(async (event) => {
+  await requireAuth(event);
   try {
-    // ...existing code...
-
     const body = await readBody(event)
     // Build workflow context
     const batchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2,8)}`;
@@ -18,9 +18,6 @@ export default defineEventHandler(async (event) => {
       stage: WorkflowStage.FIND_LOCATION,
       timestamp: new Date().toISOString(),
       completedStages: [],
-      metadata: {
-        inputQueries: body.inputQueries || []
-      }
     };
     await sendToPostOffice({
       util: 'find-location',

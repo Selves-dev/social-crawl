@@ -29,7 +29,7 @@ export async function handleTextRequest(msg: any): Promise<AIResponse> {
   try {
     logger.info('[handleTextRequest] Processing text request');
     const aiReq: AIRequest = msg.payload || msg; // Accept either PostOfficeMessage or AIRequest
-    logger.info('[handleTextRequest] Received AIRequest', { aiReq });
+    logger.debug('[handleTextRequest] Received AIRequest', { aiReq });
     const messages = [{ role: 'user', content: aiReq.prompt }];
     return await fetchOpenAIResponse(messages, aiReq.options || {});
   } catch (error) {
@@ -76,13 +76,15 @@ async function fetchOpenAIResponse(messages: any[], options: { maxTokens?: numbe
     const config = getAzureOpenAIConfig();
     const url = `${config.endpoint}/openai/deployments/${config.deployment}/chat/completions?api-version=${config.apiVersion}`;
 
+    logger.info('[AI Request] Making AI request');
+
     const requestBody = {
       messages,
       temperature: config.temperature,
       max_tokens: options.maxTokens || 4096
     };
 
-    logger.info('[fetchOpenAIResponse] Making API request', { 
+    logger.debug('[fetchOpenAIResponse] Making API request', { 
       url: url.replace(/api-key=[^&]+/, 'api-key=***'),
       messageCount: messages.length 
     });
@@ -96,7 +98,7 @@ async function fetchOpenAIResponse(messages: any[], options: { maxTokens?: numbe
     });
 
     const data = response.data;
-    // logger.info('[fetchOpenAIResponse] API response', { data });
+    logger.debug('[fetchOpenAIResponse] API response', { data });
     const text = data.choices?.[0]?.message?.content || '';
 
     if (!text) {
@@ -121,17 +123,17 @@ async function buildMessageContent(prompt: string, mediaUrl?: string): Promise<a
   const content: any[] = [{ type: 'text', text: prompt }];
 
   if (!mediaUrl) {
-    logger.info('[buildMessageContent] No mediaUrl provided, returning text-only content');
+    logger.debug('[buildMessageContent] No mediaUrl provided, returning text-only content');
     return content;
   }
 
   try {
-    logger.info('[buildMessageContent] Fetching media manifest', { mediaUrl });
+    logger.debug('[buildMessageContent] Fetching media manifest', { mediaUrl });
     
     const blobJson = await getBlobJson(mediaUrl) as BlobManifest;
     const media = blobJson?.media || [];
 
-    logger.info('[buildMessageContent] Processing media items', { count: media.length });
+    logger.debug('[buildMessageContent] Processing media items', { count: media.length });
 
     for (const item of media) {
       if (!item.url) {
@@ -143,13 +145,13 @@ async function buildMessageContent(prompt: string, mediaUrl?: string): Promise<a
       
       for (const url of urls) {
         if (isImageUrl(url) || isImageType(item.type)) {
-          logger.info('[buildMessageContent] Adding image to content', { url, type: item.type });
+          logger.debug('[buildMessageContent] Adding image to content', { url, type: item.type });
           content.push({ 
             type: 'image_url', 
             image_url: { url } 
           });
         } else {
-          logger.info('[buildMessageContent] Skipping non-image media', { url, type: item.type });
+          logger.debug('[buildMessageContent] Skipping non-image media', { url, type: item.type });
         }
       }
     }

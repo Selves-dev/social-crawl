@@ -1,6 +1,6 @@
 import type { PostOfficeMessage } from '../../shared/types';
 import { crawlSearch } from '../../shared/crawlSearch';
-import type { MediaObject } from '../../shared/crawlSearch/types';
+import type { CrawlSearchResult } from '../../shared/crawlSearch/types';
 import { uploadJsonToBlob, getBlobName, getPlatform } from '../../shared/azureBlob';
 import type { BlobManifest } from '../../shared/types';
 import { logger } from '../../shared/logger';
@@ -48,10 +48,10 @@ export async function handleGetMedia(message: PostOfficeMessage): Promise<void> 
       }
       
       const blobName = getBlobName({ platform, id });
-      logger.info('[get-media] Uploading mappedObject to blob', { containerName, blobName });
+      logger.debug('[get-media] Uploading mappedObject to blob', { containerName, blobName });
       const blobUrl = await uploadJsonToBlob(containerName, blobName, mappedObject);
       
-      logger.info('[get-media] Routing blobUrl to post-office for prep-media', { blobUrl, workflow });
+      logger.debug('[get-media] Routing blobUrl to post-office for prep-media', { blobUrl, workflow });
       await sendToPostOffice({
         util: 'prep-media',
         type: 'prep-media',

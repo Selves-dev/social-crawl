@@ -22,21 +22,29 @@ export const analyseMediaLetterbox: (message: PostOfficeMessage) => Promise<void
 export function startAnalyseMediaIntray() {
   logger.debug('[StartAnalyseMediaIntray] Registering queue subscriber for analyseMediaQueue');
   analyseMediaQueue.subscribe(async (message: PostOfficeMessage) => {
-    logger.info('[Analyse-Media-Intray] Received message from queue', { type: message.type, workflow: message.workflow, payload: message.payload });
+    logger.debug('[Analyse-Media-Intray] Received message from queue', { type: message.type, workflow: message.workflow, payload: message.payload });
     const { type, workflow } = message;
     if (!workflow) {
       logger.error('[Analyse-Media-Intray] Missing workflow context');
       throw new Error('[Analyse-Media-Intray] Missing workflow context');
     }
     switch (type) {
-      case 'analyse_media': {
+      case 'analyse-media': {
         logger.info('[Analyse-Media-Intray] Routing to handleAnalyseMedia');
         await handleAnalyseMedia(message);
         break;
       }
-      case 'venue_basics':
+      case 'venue-basics':
         logger.info('[Analyse-Media-Intray] Routing to handleVenueBasics');
         await handleVenueBasics(message);
+        break;
+      case 'ai-response':
+        logger.info('[Analyse-Media-Intray] Routing to handleAiResponse');
+        await handleAnalysisResponse(message);
+        break;
+      case 'venue-response':
+        logger.info('[Analyse-Media-Intray] Routing to handleVenueResponse');
+        await handleVenueResponse(message);
         break;
       default:
         logger.warn('[analyse-media] Unknown message type', { type: message.type, payload: message.payload });

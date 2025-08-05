@@ -5,21 +5,8 @@ import { parseGoogleHtml } from './googleParser';
 import { parseTikTokHtml } from './tiktokParser';
 import { parseYouTubeHtml } from './youtubeParser';
 import { parseInstagramHtml } from './instagramParser';
-
 import type { CrawlSearchResult } from './types';
-
-
-// Helper to construct a Google search URL with realistic parameters
-function buildGoogleSearchUrl(query: string, platform: string): string {
-  // Only use essential parameters, randomize num for result count
-  const num = Math.floor(Math.random() * 30) + 20; // 20-50 results
-  const params = new URLSearchParams({
-    q: `${query} ${platform}`,
-    num: num.toString(),
-    udm: '7', // ensure video results
-  });
-  return `https://www.google.com/search?${params.toString()}`;
-}
+import { buildGoogleSearchUrl } from './googleParser';
 
 export async function crawlSearch(input: string, platform?: string): Promise<any> {
 
@@ -30,7 +17,8 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
     const html = typeof response === 'string' ? response : response.body;
     logger.debug(`[crawlSearch] Fetched HTML for platform: ${platform}, url: ${input}, length: ${html?.length}`);
     let result;
-    // Nitro does not support fs/file output. Logging only.
+
+
     if (platform === 'tiktok') {
       logger.debug(`[crawlSearch] About to call parseTiktokHtml. Input length: ${html?.length}, first 200 chars: ${typeof html === 'string' ? html.slice(0, 200) : ''}`);
       [result] = parseTikTokHtml(html);
@@ -38,18 +26,24 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
         logger.warn(`[crawlSearch] TikTok parser returned no result for url: ${input}`);
       }
       return result;
+
+
     } else if (platform === 'youtube') {
       [result] = parseYouTubeHtml(html);
       if (!result) {
         logger.warn(`[crawlSearch] YouTube parser returned no result for url: ${input}`);
       }
       return result;
+
+
     } else if (platform === 'instagram') {
       [result] = parseInstagramHtml(html);
       if (!result) {
         logger.warn(`[crawlSearch] Instagram parser returned no result for url: ${input}`);
       }
       return result;
+
+
     } else {
       logger.warn(`[crawlSearch] Unknown platform or no parser for platform: ${platform}, url: ${input}`);
       return { link: input };
@@ -57,7 +51,6 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
   }
 
   // Otherwise, treat as search stage
-  // Search Google for each platform, with random delay between requests
 
   const platforms = ['tiktok', 'youtube', 'instagram'];
   const results: Record<string, string[]> = {};
@@ -70,7 +63,7 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
 
     const googleUrl = buildGoogleSearchUrl(input, platform);
     logger.debug(`[crawlSearch] Building Google search URL for platform: ${platform}`);
-    logger.debug(`[crawlSearch] Google URL: ${googleUrl}`);
+    logger.info(`[crawlSearch] Google URL: ${googleUrl}`);
 
     try {
       await randomDelay();
@@ -92,6 +85,7 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
 
       logger.debug(`[crawlSearch] (Google) Raw HTML length: ${htmlToParse.length}`);
       const links = parseGoogleHtml(htmlToParse, googleUrl).map(r => r.link);
+
       logger.debug(`[crawlSearch] Parsed ${links.length} links for platform: ${platform}`);
 
       results[platform] = links;
@@ -106,15 +100,14 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
 }
 
 
-// Fetch and parse with ScrapeNinja RapidAPI
 export async function fetchWithRapidApi(url: string): Promise<any> {
   const rapidApiKey = process.env["rapidapi-key"];
   if (!rapidApiKey) {
-    logger.error('[fetchWithRapidApi] RAPID-API-KEY is not set in environment variables.');
-    throw new Error('RAPID-API-KEY is not set in environment variables.');
+    logger.error('[fetchWithRapidApi] rapid-api-key is not set in environment variables.');
+    throw new Error('rapid-api-key is not set in environment variables.');
   }
   const endpoint = 'https://scrapeninja.p.rapidapi.com/scrape';
-  // console.log(`[fetchWithRapidApi] Fetching URL: ${url}`);
+
   try {
     const response = await axios.post(endpoint, { url }, {
       headers: {

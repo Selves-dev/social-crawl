@@ -1,5 +1,6 @@
 import type { CrawlSearchResult, YouTubeVideoData, YouTubePlayerResponse, YouTubeInitialData } from './types';
 import * as cheerio from 'cheerio';
+import { logger } from '../../shared/logger';
 
 
 // --- MAIN PARSER FUNCTION ---
@@ -19,13 +20,17 @@ export function parseYouTubeHtml(htmlContent: string): CrawlSearchResult[] {
         try {
           const jsonStr = script.split('var ytInitialData =')[1].split('};')[0] + '}';
           ytInitialData = JSON.parse(jsonStr);
-        } catch {}
+        } catch (err) {
+          logger.error('YouTube parser: Failed to parse ytInitialData', err as Error);
+        }
       }
       if (script.includes('var ytInitialPlayerResponse =')) {
         try {
           const jsonStr = script.split('var ytInitialPlayerResponse =')[1].split('};')[0] + '}';
           ytInitialPlayerResponse = JSON.parse(jsonStr);
-        } catch {}
+        } catch (err) {
+          logger.error('YouTube parser: Failed to parse ytInitialPlayerResponse', err as Error);
+        }
       }
     }
 
@@ -58,7 +63,7 @@ export function parseYouTubeHtml(htmlContent: string): CrawlSearchResult[] {
           id = candidate;
         } else {
           id = undefined;
-          console.warn('YouTube parser: Could not extract valid video id from URL:', video_url);
+          logger.warn('YouTube parser: Could not extract valid video id from URL', { video_url });
         }
       }
     }
@@ -83,9 +88,9 @@ export function parseYouTubeHtml(htmlContent: string): CrawlSearchResult[] {
       thumbnail: thumbnail_url,
       date,
     };
-    console.log('YouTube parser: Parsed video result:', result);
+    logger.debug('YouTube parser: Parsed video result', { result });
     // Print each field for clarity
-    console.log('YouTube parser: Mapped fields:', {
+    logger.debug('YouTube parser: Mapped fields', {
       mediaId: result.mediaId,
       link: result.link,
       username: result.username,
@@ -98,7 +103,7 @@ export function parseYouTubeHtml(htmlContent: string): CrawlSearchResult[] {
     });
     return [result];
   } catch (error) {
-    console.error('YouTube parser: Error parsing HTML:', (error as Error).message);
+    logger.error('YouTube parser: Error parsing HTML', error as Error);
     return [];
   }
 }
@@ -156,7 +161,9 @@ function extractLikeCount(ytInitialData: YouTubeInitialData | null): string {
         }
       }
     }
-  } catch {}
+  } catch (err) {
+    logger.error('YouTube parser: Failed to extract like count', err as Error);
+  }
   return '';
 }
 
@@ -166,15 +173,15 @@ export default parseYouTubeHtml;
 // Utility function for debugging/testing
 export function printVideoInfo(data: YouTubeVideoData | null): void {
     if (!data) {
-        console.log('No data found');
+        logger.warn('No data found');
         return;
     }
 
-    console.log(`YouTube URL: ${data.video_url || 'Not found'}`);
-    console.log(`Title: ${data.title}`);
-    console.log(`Author: ${data.author}`);
-    console.log(`Description: ${data.description || 'No description found'}`);
-    console.log(`View Count: ${data.view_count}`);
-    console.log(`Like Count: ${data.like_count}`);
-    console.log(`Thumbnail URL: ${data.thumbnail_url}`);
+    logger.debug('YouTube URL', { url: data.video_url || 'Not found' });
+    logger.debug('Title', { title: data.title });
+    logger.debug('Author', { author: data.author });
+    logger.debug('Description', { description: data.description || 'No description found' });
+    logger.debug('View Count', { viewCount: data.view_count });
+    logger.debug('Like Count', { likeCount: data.like_count });
+    logger.debug('Thumbnail URL', { thumbnail_url: data.thumbnail_url });
 }

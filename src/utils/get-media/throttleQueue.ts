@@ -50,7 +50,7 @@ export class GetMediaThrottleQueue {
       applicationProperties
     });
 
-    logger.info(`Get media job queued: ${messageId}`, {
+    logger.debug(`Get media job queued: ${messageId}`, {
       service: 'get-media',
       jobId: messageId,
       jobType: job.type
@@ -71,6 +71,7 @@ export class GetMediaThrottleQueue {
               service: 'get-media',
               messageId: msg.messageId
             });
+            await new Promise(resolve => setTimeout(resolve, 1200));
             await this.receiver?.completeMessage(msg);
             return;
           }

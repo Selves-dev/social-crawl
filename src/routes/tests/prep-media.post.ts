@@ -1,11 +1,13 @@
 import { defineEventHandler, readBody } from 'h3';
+import { requireAuth } from '../../middleware/auth';
 import { sendToPostOffice } from '../../utils/shared/postOffice/postman';
 
 export default defineEventHandler(async (event) => {
+  await requireAuth(event);
   const body = await readBody(event);
   console.info('[prep-media test] Starting workflow test', { body });
   // Accept 'blobPath' in the request body, e.g. 'youtube/json/d_1qcZb-S80/1753983592882.json'
-  const blobPath = body?.blobPath || 'tiktok/json/7526297570700774678/1753981861484.json';
+  const blobPath = body?.blobPath || 'youtube/json/oDBrHUXWVtw/1754125875587.json';
   const baseUrl = 'https://socialcrawlstorage.blob.core.windows.net/media/';
   const mediaUrl = `${baseUrl}${blobPath}`;
   const workflow = body?.workflow || { batchId: 'test-batch', stage: 'prep-media', timestamp: new Date().toISOString() };
@@ -13,6 +15,7 @@ export default defineEventHandler(async (event) => {
   await sendToPostOffice({
     util: 'prep-media',
     type: 'prep-media',
+    apiSecret: process.env['taash-secret'],
     workflow,
     payload: {
       blobUrl: mediaUrl,

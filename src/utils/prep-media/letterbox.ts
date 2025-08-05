@@ -21,15 +21,15 @@ export const prepMediaLetterbox: (message: PostOfficeMessage) => Promise<void> =
 export function startPrepMediaIntray() {
   logger.debug('[StartPrepMediaIntray] Registering queue subscriber for prepMediaQueue');
   prepMediaQueue.subscribe(async (message: PostOfficeMessage) => {
-    logger.info('[Prep-Media-Intray] Received message from queue', { type: message.type, workflow: message.workflow, payload: message.payload });
+    logger.debug('[Prep-Media-Intray] Received message from queue', { type: message.type, workflow: message.workflow, payload: message.payload });
     const { type, workflow } = message;
     if (!workflow) {
       logger.error('[Prep-Media-Intray] Missing workflow context');
       throw new Error('[Prep-Media-Intray] Missing workflow context');
     }
     switch (type) {
-      case 'prepare-media':
-        logger.info('[Prep-Media-Intray] Routing to handlePrepareMedia');
+      case 'prep-media':
+        logger.debug('[Prep-Media-Intray] Routing to handlePrepareMedia');
         await handlePrepareMedia(message);
         break;
       default:

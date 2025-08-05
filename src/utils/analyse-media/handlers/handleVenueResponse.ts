@@ -1,7 +1,7 @@
 
 import { logger } from '../../shared/logger';
 import type { Venue } from '../../shared/types';
-import { saveVenue } from '../../shared/database';
+import { saveVenue } from '../../shared/dbStore';
 
 /**
  * Handler for processing AI venue search responses.

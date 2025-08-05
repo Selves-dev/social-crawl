@@ -1,7 +1,9 @@
 import { defineEventHandler, readBody } from 'h3';
+import { requireAuth } from '../../middleware/auth';
 import { sendToPostOffice } from '../../utils/shared/postOffice/postman';
 
 export default defineEventHandler(async (event) => {
+  await requireAuth(event);
   const body = await readBody(event);
   console.info('[prep-media test] Starting workflow test', { body });
   // Accept 'blobPath' in the request body, e.g. 'youtube/json/d_1qcZb-S80/1753983592882.json'
@@ -13,6 +15,7 @@ export default defineEventHandler(async (event) => {
   await sendToPostOffice({
     util: 'crawl-media',
     type: 'prep-media-queued',
+    apiSecret: process.env['taash-secret'],
     workflow,
     payload: {
       blobUrl: mediaUrl,

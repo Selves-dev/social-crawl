@@ -50,7 +50,7 @@ export class AnalyseMediaThrottleQueue {
       applicationProperties
     });
 
-    logger.info(`Analyse media job queued: ${messageId}`, {
+    logger.debug(`Analyse media job queued: ${messageId}`, {
       service: 'analyse-media',
       jobId: messageId,
       jobType: job.type

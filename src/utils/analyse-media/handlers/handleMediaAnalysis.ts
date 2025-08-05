@@ -26,9 +26,8 @@ export async function handleAnalyseMedia(message: PostOfficeMessage) {
 
   // Build analysis prompt
   const prompt = buildAnalysisPrompt(blobJson, workflow);
-  logger.info('buildAnalysisPrompt called');
 
-  logger.info('Preparing to send image/text analysis job to ai-service via postman');
+  logger.info('BuildAnalysisPrompt called. reparing to send image/text analysis job to ai-service via postman');
   const postmanPayload = {
     util: 'ai-service',
     type: 'text-image',
@@ -39,11 +38,11 @@ export async function handleAnalyseMedia(message: PostOfficeMessage) {
       mediaUrl: blobUrl,
       responseHandler: {
         util: 'analyse-media',
-        type: 'ai_response'
+        type: 'ai-response'
       }
     }
   };
-  logger.info('[handleAnalyseMedia] Full postman payload:', postmanPayload);
+  logger.debug('[handleAnalyseMedia] Full postman payload:', postmanPayload);
   // Send to ai-service via postal system (image/text only)
   await sendToPostOffice(postmanPayload);
   logger.info('Sent image/text analysis job to ai-service via postal system');

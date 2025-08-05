@@ -30,9 +30,9 @@ export async function handleSearchList(message: PostOfficeMessage): Promise<void
     for (const platform of Object.keys(parsedResults)) {
       const links = parsedResults[platform];
       for (const link of links) {
-        logger.info('[search-list] Sending job to post-office (sendToPostOffice):', {
+        logger.debug('[search-list] Sending job to post-office (sendToPostOffice):', {
           util: 'get-media',
-          type: 'get-media-queued',
+          type: 'get-media',
           workflow: job.workflow,
           payload: {
             link,
@@ -42,7 +42,7 @@ export async function handleSearchList(message: PostOfficeMessage): Promise<void
         
         await sendToPostOffice({
           util: 'get-media',
-          type: 'get-media-queued',
+          type: 'get-media',
           apiSecret: process.env['taash-secret'],
           workflow,
           payload: {

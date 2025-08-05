@@ -69,18 +69,6 @@ export interface TikTokVideoData {
     stickerText: string[];
   }>;
 }
-// --- Standardized media object for all platform parsers ---
-export interface MediaObject {
-  id?: string;
-  link: string;
-  snippet?: string;
-  title: string;
-  likeCount?: number | null;
-  viewCount?: number | null;
-  username?: string;
-  caption?: string;
-  thumbnail?: string;
-}
 
 export interface YouTubeInitialData {
     // Use 'any' for flexibility, or add only the fields you actually use
