@@ -21,6 +21,7 @@ yarn.lock
 
 # Build directories
 builds/
+!builds/prod/Dockerfile
 dist/
 
 # Nitro build output
