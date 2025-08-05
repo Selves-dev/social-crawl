@@ -17,6 +17,9 @@ COPY package*.json pnpm-lock.yaml* ./
 
 # Install only production dependencies
 RUN pnpm install --prod --frozen-lockfile && pnpm store prune
+# Install sharp for Alpine Linux (musl)
+RUN npm install --include=optional sharp && \
+    npm install --os=linux --libc=musl --cpu=x64 sharp
 
     # Copy Nitro build output
     COPY .output/ ./output/
