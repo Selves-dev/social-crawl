@@ -18,8 +18,8 @@ COPY package*.json pnpm-lock.yaml* ./
 # Install only production dependencies
 RUN pnpm install --prod --frozen-lockfile && pnpm store prune
 
-    # Copy built application
-    COPY builds/prod/dist/ ./dist/
+    # Copy Nitro build output
+    COPY .output/ ./output/
 
 
 # Change ownership to non-root user
@@ -34,4 +34,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
 # Start the application
-CMD ["node", "dist/server/index.mjs"]
+CMD ["node", "output/server/index.mjs"]
