@@ -4,7 +4,7 @@ import { logger } from '../../shared/logger';
 
 
 // --- MAIN PARSER FUNCTION ---
-export function parseYouTubeHtml(htmlContent: string): CrawlSearchResult[] {
+export function parseYouTubeHtml(htmlContent: string, originalUrl?: string): CrawlSearchResult[] {
   try {
     const $ = cheerio.load(htmlContent);
     // Extract JSON data from scripts
@@ -46,24 +46,32 @@ export function parseYouTubeHtml(htmlContent: string): CrawlSearchResult[] {
 
     // Extract video id from canonical URL robustly
     let id: string | undefined = undefined;
-    if (video_url) {
+    let urlToAnalyze = video_url;
+    
+    // If no canonical URL found, try the original URL
+    if (!urlToAnalyze && originalUrl) {
+      urlToAnalyze = originalUrl.replace(/&amp;/g, '&'); // Decode HTML entities
+      logger.debug('YouTube parser: Using original URL as fallback', { originalUrl: urlToAnalyze });
+    }
+    
+    if (urlToAnalyze) {
       // Try to extract the video id from common YouTube URL patterns
-      const match = video_url.match(/[?&]v=([\w-]{11})/) ||
-        video_url.match(/youtube\.com\/watch\?v=([\w-]{11})/) ||
-        video_url.match(/youtube\.com\/embed\/([\w-]{11})/) ||
-        video_url.match(/youtube\.com\/shorts\/([\w-]{11})/);
+      const match = urlToAnalyze.match(/[?&]v=([\w-]{11})/) ||
+        urlToAnalyze.match(/youtube\.com\/watch\?v=([\w-]{11})/) ||
+        urlToAnalyze.match(/youtube\.com\/embed\/([\w-]{11})/) ||
+        urlToAnalyze.match(/youtube\.com\/shorts\/([\w-]{11})/);
       if (match && match[1]) {
         id = match[1];
       } else {
         // Try last segment for canonical URLs like /watch?v= or /shorts/
-        const parts = video_url.split('/');
+        const parts = urlToAnalyze.split('/');
         const candidate = parts[parts.length - 1].split('?')[0];
         // YouTube video ids are 11 characters, alphanumeric, - and _
         if (/^[\w-]{11}$/.test(candidate)) {
           id = candidate;
         } else {
           id = undefined;
-          logger.warn('YouTube parser: Could not extract valid video id from URL', { video_url });
+          logger.warn('YouTube parser: Could not extract valid video id from URL', { video_url: urlToAnalyze });
         }
       }
     }
@@ -79,7 +87,7 @@ export function parseYouTubeHtml(htmlContent: string): CrawlSearchResult[] {
 
     const result = {
       mediaId: id,
-      link: video_url,
+      link: video_url || (originalUrl ? originalUrl.replace(/&amp;/g, '&') : ''),
       username: author,
       title,
       caption: description,
@@ -133,7 +141,12 @@ function extractAuthor($: any): string {
 }
 
 function extractVideoUrl($: any): string {
-  return $('link[rel="canonical"]').attr('href') || '';
+  const canonicalUrl = $('link[rel="canonical"]').attr('href') || '';
+  if (canonicalUrl) {
+    // Decode HTML entities in the URL
+    return canonicalUrl.replace(/&amp;/g, '&');
+  }
+  return '';
 }
 
 function extractThumbnailUrl($: any): string {

@@ -29,7 +29,7 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
 
 
     } else if (platform === 'youtube') {
-      [result] = parseYouTubeHtml(html);
+      [result] = parseYouTubeHtml(html, input);
       if (!result) {
         logger.warn(`[crawlSearch] YouTube parser returned no result for url: ${input}`);
       }

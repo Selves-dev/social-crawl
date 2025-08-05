@@ -43,7 +43,15 @@ export async function handleGetMedia(message: PostOfficeMessage): Promise<void> 
       // Use mediaId or id, never link
       const id = mappedObject.mediaId || mappedObject.id;
       if (!id) {
-        logger.error('[get-media] Cannot determine unique id for blob naming');
+        logger.error('[get-media] Cannot determine unique id for blob naming', new Error('Missing unique identifier'), {
+          platform,
+          link: job.payload?.link,
+          mappedObject: { 
+            mediaId: mappedObject.mediaId, 
+            id: mappedObject.id, 
+            link: mappedObject.link 
+          }
+        });
         return;
       }
       
