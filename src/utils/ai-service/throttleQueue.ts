@@ -12,8 +12,8 @@ export class AIServiceThrottleQueue {
   private readonly maxConcurrentJobs: number;
 
   constructor() {
-    this.queueName = process.env["ASB-AI-SERVICE-QUEUE"] || 'ai-service';
-    this.maxConcurrentJobs = parseInt(process.env["AI-SERVICE-MAX-CONCURRENT-JOBS"] || '2', 10);
+    this.queueName = process.env["asb-ai-service-queue"] || 'ai-service';
+    this.maxConcurrentJobs = parseInt(process.env["asb-ai-service-max-concurrent-jobs"] || '2', 10);
   }
 
   async initialize(): Promise<void> {
@@ -77,6 +77,7 @@ export class AIServiceThrottleQueue {
           }
 
           await handler(msg.body as PostOfficeMessage);
+
           await this.receiver?.completeMessage(msg);
         } catch (error) {
           logger.error('Message handler error', error as Error, {

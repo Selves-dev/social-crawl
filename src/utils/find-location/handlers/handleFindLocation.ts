@@ -23,7 +23,7 @@ export async function handleLocationRequest(workflowContext: any): Promise<void>
     // Send message to ai-service using standardized shape
     await sendToPostOffice({
       util: 'ai-service',
-      type: 'ai-request',
+      type: 'text',
       apiSecret: process.env['taash-secret'],
       workflow: workflowContext,
       payload: {
@@ -50,8 +50,7 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: a
     let locationName = '';
     let countryCode = '';
     let queries: string[] = [];
-    
-    const text = aiResponse?.response?.text || aiResponse?.text;
+    const text = aiResponse?.result?.text;
     logger.info('[location-response] Parsing AI response text', { text });
     
     if (text && typeof text === 'string') {

@@ -32,6 +32,7 @@ export async function handleAnalyseMedia(message: PostOfficeMessage) {
   const postmanPayload = {
     util: 'ai-service',
     type: 'text-image',
+    apiSecret: process.env['taash-secret'],
     workflow,
     payload: {
       prompt,

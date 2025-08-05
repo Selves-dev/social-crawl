@@ -131,6 +131,7 @@ export async function handlePrepareMedia(message: any) {
       const outgoingMessage = {
         util: 'analyse-media',
         type: 'analyse-media-queued',
+        apiSecret: process.env['taash-secret'],
         workflow,
         payload: {
           blobUrl

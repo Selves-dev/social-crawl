@@ -5,16 +5,11 @@ import { handleTextImageRequest, handleTextRequest } from './handlers/handleMode
 import { handleSearchRequest } from './handlers/handleSearchRequest';
 import { logger } from '../shared/logger';
 
-/**
- * AI-Service Letterbox - Internal Office Mail Handler
- * 
- * Receives AI requests from PostOffice and handles internal processing.
- * Processes AI requests and sends responses back through the postal system.
- */
+
 // Function for PostOffice to deliver a message to the intray (enqueue to queue)
 export const aiServiceLetterbox: (message: PostOfficeMessage) => Promise<void> = async (message) => {
   const { util, type, workflow, payload } = message;
-  logger.debug('[aiServiceLetterbox] Called with message', { util, type, workflow, payload });
+  logger.info('[aiServiceLetterbox] Called with message', { util, type, workflow, payload });
   if (!workflow) {
     logger.error('[aiServiceLetterbox] Missing workflow context');
     throw new Error('[aiServiceLetterbox] Missing workflow context');
@@ -61,6 +56,7 @@ export function startAIServiceIntray() {
       await sendToPostOffice({
         util: responseHandler.util,
         type: responseHandler.type,
+        apiSecret: process.env['taash-secret'],
         workflow,
         payload: {
           request: message,

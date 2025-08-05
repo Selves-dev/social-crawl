@@ -18,6 +18,7 @@ export async function handleVenueBasics(message: any): Promise<any> {
   await sendToPostOffice({
     util: 'ai-service',
     type: 'search',
+    apiSecret: process.env['taash-secret'],
     workflow: message.workflow,
     payload: {
       prompt,
