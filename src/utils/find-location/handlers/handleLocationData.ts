@@ -19,7 +19,7 @@ export async function upsertLocationData({ location, countryCode, queries}: {
   // Log the result of the filter before upsert
   const matched = await collection.find(filter).toArray();
   const update = {
-    $addToSet: { queries: { $each: queries } },
+    $addToSet: { queries: { $each: Array.isArray(queries) ? queries : [queries] } },
     $setOnInsert: { venuesFound: 1 },
     $set: {
       timestamp: new Date().toISOString()
