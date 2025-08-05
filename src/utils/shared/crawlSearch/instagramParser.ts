@@ -1,4 +1,5 @@
 import type { CrawlSearchResult } from './types';
+import { logger } from '../../shared/logger';
 
 // Helper functions (extractInstagramId, decodeHtmlEntities) are unchanged and work correctly.
 function extractInstagramId(url: string): string {
@@ -17,7 +18,6 @@ function decodeHtmlEntities(text: string): string {
 function mapInstagramHtmlToCrawlSearchResult(html: string): CrawlSearchResult | null {
   try {
     // --- Step 1: Find the Link ---
-    // --- Step 1: Find the Link ---
     const urlMatch = html.match(/<link rel="canonical" href="(.+?)"/s);
     const url = urlMatch ? urlMatch[1] : '';
 
@@ -34,7 +34,7 @@ function mapInstagramHtmlToCrawlSearchResult(html: string): CrawlSearchResult | 
     const descriptionMatch = html.match(/<meta property="og:description" content="(.+?)"/s);
     const description = descriptionMatch ? decodeHtmlEntities(descriptionMatch[1]) : '';
 
-    console.log('Extracted Description:', description); // This should now show the full description.
+    logger.debug('Extracted Description', { description }); // This should now show the full description.
 
     // --- Step 5: Parse the Description to get the details ---
     let username: string | undefined;
@@ -67,13 +67,14 @@ function mapInstagramHtmlToCrawlSearchResult(html: string): CrawlSearchResult | 
         likeCount,
         thumbnail: thumbnailUrl,
         date: publishDate,
+        source: 'instagram', // Set platform as source
     };
 
-    console.log('Final Mapped Result:', result);
+    logger.debug('Final Mapped Result', { result });
     return result;
 
   } catch (error) {
-    console.error('Error in parser:', error);
+    logger.error('Instagram parser: Error mapping HTML', error as Error);
     return null;
   }
 }

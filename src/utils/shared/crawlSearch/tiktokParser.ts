@@ -1,20 +1,16 @@
 import type { CrawlSearchResult, TikTokVideoData } from './types';
+import { logger } from '../../shared/logger';
 
 // --- MAIN PARSER FUNCTION ---
 export function parseTikTokHtml(htmlContent: string): CrawlSearchResult[] {
-  console.log('TikTok parser: Processing HTML content...');
-  
-  if (!htmlContent || typeof htmlContent !== 'string') {
-    console.log('TikTok parser: Invalid HTML content, returning empty array');
-    return [];
-  }
+  logger.info('TikTok parser: Processing HTML content...');
 
   try {
     // Find the script tag containing the video data
     const scriptMatch = htmlContent.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">(.*?)<\/script>/s);
     
     if (!scriptMatch) {
-      console.log('TikTok parser: Could not find data script tag');
+      logger.debug('TikTok parser: Could not find data script tag');
       return [];
     }
 
@@ -25,7 +21,7 @@ export function parseTikTokHtml(htmlContent: string): CrawlSearchResult[] {
     const videoData = jsonData?.__DEFAULT_SCOPE__?.['webapp.video-detail']?.itemInfo?.itemStruct;
     
     if (!videoData) {
-      console.log('TikTok parser: Could not find video data in JSON');
+      logger.debug('TikTok parser: Could not find video data in JSON');
       return [];
     }
 
@@ -33,15 +29,15 @@ export function parseTikTokHtml(htmlContent: string): CrawlSearchResult[] {
     const result = mapTikTokVideoData(videoData);
     
     if (result) {
-      console.log('TikTok parser: Successfully parsed HTML, returning 1 result');
+      logger.debug('TikTok parser: Successfully parsed HTML, returning 1 result');
       return [result];
     } else {
-      console.log('TikTok parser: Failed to map video data');
+      logger.debug('TikTok parser: Failed to map video data');
       return [];
     }
 
   } catch (error) {
-    console.error('TikTok parser: Error parsing HTML content:', error);
+    logger.error('TikTok parser: Error parsing HTML content', error as Error);
     return [];
   }
 }
@@ -49,7 +45,7 @@ export function parseTikTokHtml(htmlContent: string): CrawlSearchResult[] {
 // --- MAP TIKTOK VIDEO DATA TO STANDARD FORMAT ---
 function mapTikTokVideoData(videoData: TikTokVideoData): CrawlSearchResult | null {
   try {
-    console.log('TikTok parser: Mapping video data for ID:', videoData.id);
+    logger.debug('TikTok parser: Mapping video data for ID', { id: videoData.id });
     
     // Build TikTok URL
     const author_username = videoData.author?.uniqueId || '';
@@ -97,31 +93,18 @@ function mapTikTokVideoData(videoData: TikTokVideoData): CrawlSearchResult | nul
       likeCount: videoData.stats?.diggCount || undefined,
       thumbnail: videoData.video?.cover || '',
       date,
+      source: 'tiktok', // Set platform as source
     };
 
-    console.log('TikTok parser: Successfully mapped video:', result);
+    logger.debug('TikTok parser: Successfully mapped video', { result });
 
     return result;
 
   } catch (error) {
-    console.error('TikTok parser: Error mapping video data:', error);
+    logger.error('TikTok parser: Error mapping video data', error as Error);
     return null;
   }
 }
-
-// --- VALIDATION FUNCTION ---
-export function validateTikTokResponse(htmlContent: string): boolean {
-  if (!htmlContent || typeof htmlContent !== 'string') {
-    return false;
-  }
-
-  // Check if it contains the expected TikTok HTML structure
-  const hasScriptTag = htmlContent.includes('__UNIVERSAL_DATA_FOR_REHYDRATION__');
-  const hasTikTokDomain = htmlContent.includes('tiktok.com') || htmlContent.includes('TikTok');
-  
-  return hasScriptTag && hasTikTokDomain;
-}
-
 
 // --- MAIN EXPORT ---
 export default parseTikTokHtml;

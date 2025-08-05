@@ -1,41 +1,53 @@
-import type { LetterboxHandler } from '../shared/letterboxTypes';
-import { QueueManager } from '../shared/index';
-// Letterbox for analyse-media jobs
-
+import type { PostOfficeMessage } from '../shared/types';
 import { logger } from '../shared/logger';
-import { sendPostmanMessage } from '../shared/serviceBus';
-import { handleAnalyseMedia } from './handlers/handleMediaAnalysis';
+import { analyseMediaQueue } from './throttleQueue';
 import { handleVenueBasics } from './handlers/handleVenueBasics';
-import { handleVenueResponse } from './handlers/handleVenueResponse';
+import { handleAnalyseMedia } from './handlers/handleMediaAnalysis';
 
-export const analyseMediaLetterbox: LetterboxHandler = async (message) => {
-  if (!message) {
-    logger.error('[analyse-media letterbox] Message is undefined or null');
-    return { error: 'Message is undefined or null' };
+// Function for PostOffice to deliver a message to the intray (enqueue to queue)
+export const analyseMediaLetterbox: (message: PostOfficeMessage) => Promise<void> = async (message) => {
+  // Expect standardized shape: { util, type, workflow, payload }
+  const { util, type, workflow, payload } = message;
+  logger.debug('[analyseMediaLetterbox] Called with message', { util, type, workflow, payload });
+  if (!workflow) {
+    logger.error('[analyseMediaLetterbox] Missing workflow context');
+    throw new Error('[analyseMediaLetterbox] Missing workflow context');
   }
-  if (!message.workflow) {
-    logger.error('[analyse-media letterbox] Missing workflow context in message');
-    throw new Error('[analyse-media letterbox] Missing workflow context in message');
-  }
+  // Enqueue the message to analyseMediaQueue
+  await analyseMediaQueue.sendJob(message);
+  logger.debug('[analyseMediaLetterbox] Message enqueued to analyseMediaQueue', { type });
+}
 
-  switch (message.type) {
-    case 'anayse_media':
-      return await handleAnalyseMedia(message);
-    case 'venue_basics':
-      return await handleVenueBasics(message);
-    case 'ai_response':
-      return await import('./handlers/handleAnalysisResponse').then(mod => mod.handleAnalysisResponse(message));
-    case 'ai_SearchResponse':
-      return await import('./handlers/handleVenueResponse').then(mod => mod.handleVenueResponse(message));
-    default:
-      return await handleAnalyseMedia(message);
-  }
-};
-
-analyseMediaLetterbox.initializeQueue = async () => {
-  await QueueManager.startAnalyseMediaProcessing();
-};
-
-analyseMediaLetterbox.shutdownQueue = async () => {
-  await QueueManager.stopAnalyseMediaProcessing();
-};
+// Register the intray as the queue subscriber
+export function startAnalyseMediaIntray() {
+  logger.debug('[StartAnalyseMediaIntray] Registering queue subscriber for analyseMediaQueue');
+  analyseMediaQueue.subscribe(async (message: PostOfficeMessage) => {
+    logger.debug('[Analyse-Media-Intray] Received message from queue', { type: message.type, workflow: message.workflow, payload: message.payload });
+    const { type, workflow } = message;
+    if (!workflow) {
+      logger.error('[Analyse-Media-Intray] Missing workflow context');
+      throw new Error('[Analyse-Media-Intray] Missing workflow context');
+    }
+    switch (type) {
+      case 'analyse-media': {
+        logger.info('[Analyse-Media-Intray] Routing to handleAnalyseMedia');
+        await handleAnalyseMedia(message);
+        break;
+      }
+      case 'venue-basics':
+        logger.info('[Analyse-Media-Intray] Routing to handleVenueBasics');
+        await handleVenueBasics(message);
+        break;
+      case 'ai-response':
+        logger.info('[Analyse-Media-Intray] Routing to handleAiResponse');
+        await handleAnalysisResponse(message);
+        break;
+      case 'venue-response':
+        logger.info('[Analyse-Media-Intray] Routing to handleVenueResponse');
+        await handleVenueResponse(message);
+        break;
+      default:
+        logger.warn('[analyse-media] Unknown message type', { type: message.type, payload: message.payload });
+    }
+  });
+}

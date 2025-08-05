@@ -6,7 +6,8 @@
 export * from './database'
 export * from './logger'
 export * from './serviceBus'
+export * from './postOffice'
 export * from './queueManager'
-export * from './postman/processor'
+// postman is legacy and removed from exports
 export * from './security'
 

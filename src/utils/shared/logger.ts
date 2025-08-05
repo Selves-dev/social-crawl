@@ -17,28 +17,31 @@ export interface LogContext {
   [key: string]: any
 }
 
+// Global log level (set to 'info' to suppress debug logs)
+let globalLogLevel: LogLevel = LogLevel.INFO;
+
+export function setGlobalLogLevel(level: LogLevel) {
+  globalLogLevel = level;
+}
+
 export const logger = {
   debug: (message: string, context?: LogContext) => {
-    const truncatedMessage = message.length > 300 ? message.substring(0, 300) + '...' : message
-    // TODO: Implement structured debug logging
-    console.debug(`[DEBUG] ${truncatedMessage}`, context ? JSON.stringify(context) : '')
+    if (globalLogLevel !== LogLevel.DEBUG) return;
+    const truncatedMessage = message.length > 300 ? message.substring(0, 300) + '...' : message;
+    console.debug(`[DEBUG] ${truncatedMessage}`, context ? JSON.stringify(context) : '');
   },
-  
   info: (message: string, context?: LogContext) => {
-    const truncatedMessage = message.length > 300 ? message.substring(0, 300) + '...' : message
-    // TODO: Implement structured info logging
-    console.info(`[INFO] ${truncatedMessage}`, context ? JSON.stringify(context) : '')
+    if (globalLogLevel === LogLevel.ERROR || globalLogLevel === LogLevel.WARN) return;
+    const truncatedMessage = message.length > 300 ? message.substring(0, 300) + '...' : message;
+    console.info(`[INFO] ${truncatedMessage}`, context ? JSON.stringify(context) : '');
   },
-  
   warn: (message: string, context?: LogContext) => {
-    const truncatedMessage = message.length > 300 ? message.substring(0, 300) + '...' : message
-    // TODO: Implement structured warn logging
-    console.warn(`[WARN] ${truncatedMessage}`, context ? JSON.stringify(context) : '')
+    if (globalLogLevel === LogLevel.ERROR) return;
+    const truncatedMessage = message.length > 300 ? message.substring(0, 300) + '...' : message;
+    console.warn(`[WARN] ${truncatedMessage}`, context ? JSON.stringify(context) : '');
   },
-  
   error: (message: string, error?: Error, context?: LogContext) => {
-    const truncatedMessage = message.length > 300 ? message.substring(0, 300) + '...' : message
-    // TODO: Implement structured error logging
-    console.error(`[ERROR] ${truncatedMessage}`, error?.stack || error, context ? JSON.stringify(context) : '')
+    const truncatedMessage = message.length > 300 ? message.substring(0, 300) + '...' : message;
+    console.error(`[ERROR] ${truncatedMessage}`, error?.stack || error, context ? JSON.stringify(context) : '');
   }
-}
+};

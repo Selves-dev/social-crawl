@@ -72,7 +72,7 @@ if [[ "$ENVIRONMENT" == "local" ]]; then
     
     # Create local Dockerfile
     cat > "$BUILD_DIR/Dockerfile" << 'EOF'
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -125,7 +125,7 @@ EOF
 
     # Create production Dockerfile
     cat > "$BUILD_DIR/Dockerfile" << 'EOF'
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 

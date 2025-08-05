@@ -1,31 +1,33 @@
 import { logger } from '../../shared/logger';
-import { savePerspective } from '../../shared/database';
+import { addQueryToPerspective, savePerspectiveFull, upsertPerspectiveSmartly } from '../../shared/dbStore';
+import { getBlobJson } from '../../shared/azureBlob';
 
 export async function handleAnalysisResponse(message: any) {
-  logger.info('[handleAnalysisResponse] Received AI response', { response: message.response });
+  // Support message.payload.result as the primary AI response location
+  const response = message?.payload?.result ?? message?.result ?? message?.payload?.response ?? message?.response;
+  logger.debug('[handleAnalysisResponse] Received AI response', { response });
   // Debug: log raw response text if present
-  if (typeof message?.response?.text === 'string') {
-    logger.info('[handleAnalysisResponse] Raw AI response text', { text: message.response.text });
+  if (typeof response?.text === 'string') {
+    logger.debug('[handleAnalysisResponse] Raw AI response text', { text: response.text });
   }
 
   let aiResult;
-  if (message?.response && typeof message.response.text === 'string') {
+  if (response && typeof response.text === 'string') {
     try {
-      // **CRITICAL FIX:** Clean the string before parsing
       // Replace non-breaking spaces (U+00A0) with regular spaces and then trim
-      const cleanedText = message.response.text.replace(/\u00A0/g, ' ').trim();
+      const cleanedText = response.text.replace(/\u00A0/g, ' ').trim();
       aiResult = JSON.parse(cleanedText);
       // Unwrap nested aiResult if present
       if (aiResult && aiResult.aiResult) {
         aiResult = aiResult.aiResult;
       }
-      logger.info('[handleAnalysisResponse] Parsed AI response (from text)', { aiResult });
+      logger.debug('[handleAnalysisResponse] Parsed AI response (from text)', { aiResult });
     } catch (err) {
       logger.error('Failed to parse AI response text as JSON', err as Error);
       return message; // Return original message on parse failure
     }
-  } else if (message?.response && typeof message.response === 'object' && Object.keys(message.response).length > 0) {
-    aiResult = message.response;
+  } else if (response && typeof response === 'object' && Object.keys(response).length > 0) {
+    aiResult = response;
     // Unwrap nested aiResult if present
     if (aiResult && aiResult.aiResult) {
       aiResult = aiResult.aiResult;
@@ -52,22 +54,87 @@ export async function handleAnalysisResponse(message: any) {
 
   // Build perspective object
   const { createdAt, updatedAt, ...rest } = aiResult;
-  const contextObj = aiResult.context || {};
+  const aiContext = aiResult.context || {};
+  const workflowContext = message?.workflow || {};
+  const perspectiveContext = {
+    l: aiContext.l ?? workflowContext.l ?? '',
+    cc: aiContext.cc ?? workflowContext.cc ?? '',
+    w: Array.isArray(aiContext.w)
+      ? aiContext.w
+      : aiContext.w !== undefined
+        ? [aiContext.w]
+        : Array.isArray(workflowContext.w)
+          ? workflowContext.w
+          : workflowContext.w !== undefined
+            ? [workflowContext.w]
+            : [],
+  };
+
+  // Fetch blob JSON to get mediaId, permalink, and source
+  let blobFields = {
+    mediaId: '',
+    permalink: '',
+    source: '',
+    username: '',
+    adminTitle: '',
+    date: ''
+  };
+
+  try {
+    // The AI service response wraps the original request in payload.request
+    // Original blobUrl is in payload.request.payload.mediaUrl or payload.request.payload.blobUrl
+    const blobUrl = message?.payload?.mediaUrl || 
+                   message?.payload?.blobUrl ||
+                   message?.payload?.request?.payload?.mediaUrl ||
+                   message?.payload?.request?.payload?.blobUrl;
+                   
+    if (blobUrl) {
+      const blobJson = await getBlobJson(blobUrl);
+      blobFields = {
+        mediaId: blobJson.mediaId || blobJson.id || '',
+        permalink: blobJson.link || blobJson.permalink || '',
+        source: blobJson.platform || blobJson.source || '',
+        username: blobJson.username || '',
+        adminTitle: blobJson.adminTitle || blobJson.title || '',
+        date: blobJson.date || blobJson.publishDate || new Date().toISOString().slice(0, 10)
+      };
+      logger.debug('[handleAnalysisResponse] Extracted blob fields', { 
+        blobFields,
+        availableFields: {
+          mediaId: blobJson.mediaId,
+          id: blobJson.id,
+          permalink: blobJson.permalink,
+          link: blobJson.link,
+          platform: blobJson.platform,
+          source: blobJson.source,
+          allKeys: Object.keys(blobJson)
+        }
+      });
+    } else {
+      logger.warn('[handleAnalysisResponse] No blobUrl found in message payload', { 
+        payload: message?.payload,
+        requestPayload: message?.payload?.request?.payload
+      });
+    }
+  } catch (err) {
+    logger.error('[handleAnalysisResponse] Failed to fetch blob JSON for perspective fields', err as Error);
+  }
+
   const perspective = {
     ...rest,
+    ...blobFields, // Include mediaId, permalink, source, etc. from blob
+    slug: aiResult.slug || '', // Get slug from AI response, not blob
+    mediaDescription: rest.mediaDescription ? [rest.mediaDescription] : [],
     audioDescription: [],
-    context: {
-      l: contextObj.l ?? '',
-      cc: contextObj.cc ?? '',
-      w: contextObj.w ?? '',
-    },
+    context: perspectiveContext,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
   logger.info('[handleAnalysisResponse] Final perspective object', { perspective });
 
   try {
-    await savePerspective(perspective);
+    // Use smart upsert to append mediaDescription and merge other fields
+    await upsertPerspectiveSmartly(perspective);
   } catch (err) {
     logger.error('Failed to save perspective to database', err as Error);
   }

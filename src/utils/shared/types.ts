@@ -1,3 +1,12 @@
+// Canonical message type for PostOffice routing
+// All job types below are intended to be used as the payload for PostOfficeMessage
+export interface PostOfficeMessage {
+  util: string;
+  type: string;
+  workflow: any;
+  payload: any;
+}
+
 // Venue type for AI venue extraction and MongoDB
 export interface Venue {
   name: string;
@@ -12,25 +21,21 @@ export interface Venue {
   }>;
   [key: string]: any;
 }
-// Generic job envelope type for all queues
-export type JobEnvelope<T = any> = {
-  type: string;
-  context: T;
-  workflow: import('./workflow').WorkflowContext;
-};
 
 export type SearchCrawlJob = {
+  id: string;
+  timestamp?: string;
   link?: string;
   platform: string;
-  workflow: import('./workflow').WorkflowContext;
   query?: string;
   type?: string; // Added for routing and compatibility
 };
 
 export type MediaScrapeJob = {
+  id: string;
+  timestamp?: string;
   link?: string;
   platform: string;
-  workflow: any;
   query?: string;
   type?: string; // Added for routing and compatibility
   title?: string;
@@ -48,8 +53,7 @@ export type PrepMediaJob = {
   viewCount?: number;
   likeCount?: number;
   thumbnail?: string;
-  workflow?: any;
-  // From throttleQueue.ts
+  // Removed workflow, now only in envelope
   type?: 'image' | 'video';
   metadata?: Record<string, any>;
   timestamp?: string;
@@ -61,9 +65,24 @@ export type PrepMediaJob = {
   };
 };
 
+// Job type for get-media service
+export type GetMediaJob = {
+  mediaId: string;
+  source: string;
+  requestedBy: string;
+  [key: string]: any;
+};
+
 export type AIServiceJob = {
   input: any;
-  workflow?: any;
+};
+
+export type AnalyseMediaJob = {
+  id: string;
+  timestamp?: string;
+  mediaUrl?: string;
+  blobUrl?: string;
+  type?: string;
 };
 
 // Manifest type for blobs (moved from azureBlob)
@@ -96,6 +115,6 @@ export interface Perspective {
   context: {
     l: string;
     cc: string;
-    w: string;
+    w: string[];
   };
 }

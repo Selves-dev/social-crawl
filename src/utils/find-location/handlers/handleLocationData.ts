@@ -1,3 +1,4 @@
+import { logger } from '../../shared/logger';
 /**
  * Upserts location data: adds new queries to existing location, or creates if not present.
  */
@@ -6,47 +7,39 @@ export async function upsertLocationData({ location, countryCode, queries}: {
   countryCode: string;
   queries: string[];
 }) {
-  console.info('[upsertLocationData] START', { location, countryCode, queries });
   if (!db.isConnectedStatus()) {
-    console.error('[upsertLocationData] Database not connected. Call connect() first.', { location, countryCode, queries });
+    logger.error('[upsertLocationData] Database not connected. Call connect() first.', new Error(`location: ${location}, countryCode: ${countryCode}, queries: ${JSON.stringify(queries)}`));
     throw new Error('Database not connected. Call connect() first.');
   }
   const collection = db.getCollection('locations');
-  console.info('[upsertLocationData] Got collection', { collectionName: 'locations' });
+  logger.debug('[upsertLocationData] Got collection', { collectionName: 'locations' });
   // Log all locations for debugging
   const allLocations = await collection.find({}).toArray();
-  console.info('[upsertLocationData] All locations:', allLocations);
   const filter = { location: location.trim(), countryCode: countryCode.trim() };
   // Log the result of the filter before upsert
   const matched = await collection.find(filter).toArray();
-  console.info('[upsertLocationData] Matched locations for filter:', matched);
   const update = {
-    $addToSet: { queries: { $each: queries } },
-    $setOnInsert: { venuesFound: 0 },
+    $addToSet: { queries: { $each: Array.isArray(queries) ? queries : [queries] } },
+    $setOnInsert: { venuesFound: 1 },
     $set: {
       timestamp: new Date().toISOString()
     }
   };
   const options = { upsert: true };
-  console.info('[upsertLocationData] UpdateOne filter:', filter);
-  console.info('[upsertLocationData] UpdateOne update:', update);
-  console.info('[upsertLocationData] UpdateOne options:', options);
   try {
     const result = await collection.updateOne(filter, update, options);
-    console.info('[upsertLocationData] updateOne result:', result);
     if (result.upsertedCount > 0) {
-      console.info(`[upsertLocationData] Inserted new location: ${location}, ${countryCode}`);
+      logger.debug(`[upsertLocationData] Inserted new location: ${location}, ${countryCode}`);
     } else if (result.modifiedCount > 0) {
-      console.info(`[upsertLocationData] Updated location: ${location}, ${countryCode}`);
+      logger.debug(`[INFO][upsertLocationData] Updated location: ${location}, ${countryCode}`);
     } else {
-      console.warn(`[upsertLocationData] No changes made for location: ${location}, ${countryCode}`);
+      logger.debug(`[upsertLocationData] No changes made for location: ${location}, ${countryCode}`);
     }
   } catch (err) {
-    console.error(`[upsertLocationData] Error upserting location: ${location}, ${countryCode}`);
-    console.error('[upsertLocationData] Error details:', err);
+    logger.error(`[upsertLocationData] Error upserting location: ${location}, ${countryCode}`);
+    logger.error('[upsertLocationData] Error details:', err instanceof Error ? err : new Error(String(err)));
     throw err;
   }
-  console.info('[upsertLocationData] END', { location, countryCode });
 }
 import { db } from '../../shared/database';
 

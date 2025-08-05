@@ -8,7 +8,9 @@ import { logger } from '../../shared/logger';
 import axios from 'axios';
 import { generateBlobSasUrl } from '../../shared/azureBlob';
 
-export async function handleDownload(blobId: string, mediaUrl: string, blobServiceClient: any, containerName: string) {
+export async function handleDownload(blobId: string, mediaUrl: string, containerName: string) {
+  
+  const blobServiceClient = getBlobServiceClient();
   if (!blobServiceClient) {
     logger.error('Missing Azure Storage connection string');
     throw new Error('Missing Azure Storage connection string');
@@ -18,16 +20,19 @@ export async function handleDownload(blobId: string, mediaUrl: string, blobServi
   const tmpVideoPath = path.join(os.tmpdir(), `${blobId}-video.mp4`);
   const tmpCompressedPath = path.join(os.tmpdir(), `${blobId}-video-compressed.mp4`);
   const finalVideoBlobName = `${blobId}-video.mp4`;
+
   const videoBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(finalVideoBlobName);
-  logger.info('Spawning yt-dlp for video', { cmd: 'yt-dlp', args: ['-f', 'best', '-o', tmpVideoPath, mediaUrl] });
+  logger.info('Downloading video - this does take a few seconds ...', { mediaUrl, tmpVideoPath });
+  logger.debug('Spawning yt-dlp for video', { cmd: 'yt-dlp', args: ['-f', 'best', '-o', tmpVideoPath, mediaUrl] });
+  
   await new Promise((resolve, reject) => {
     const video = spawn('yt-dlp', ['-f', 'best', '-o', tmpVideoPath, mediaUrl]);
-    video.stdout.on('data', (data) => logger.info('yt-dlp video stdout', { data: data.toString() }));
-    video.stderr.on('data', (data) => logger.info('yt-dlp video stderr', { data: data.toString() }));
+    video.stdout.on('data', (data) => logger.debug('yt-dlp video stdout', { data: data.toString() }));
+    video.stderr.on('data', (data) => logger.debug('yt-dlp video stderr', { data: data.toString() }));
     video.on('close', (code) => {
-      logger.info('yt-dlp video process closed', { code });
+      logger.debug('yt-dlp video process closed', { code });
       if (code === 0) {
-        logger.info('Downloaded video to tmp', { tmpVideoPath });
+        logger.debug('Downloaded video to tmp', { tmpVideoPath });
         resolve(true);
       } else {
         logger.error('yt-dlp video download failed');
@@ -51,15 +56,17 @@ export async function handleDownload(blobId: string, mediaUrl: string, blobServi
   if (/youtube\.com/.test(mediaUrl) && !/shorts/.test(mediaUrl)) {
     ffmpegArgs = ['-y', '-i', tmpVideoPath, '-vf', 'scale=426:240', '-b:v', '400k', '-c:v', 'libx264', '-preset', 'fast', tmpCompressedPath];
   }
-  logger.info('Spawning ffmpeg for video compression', { cmd: 'ffmpeg', args: ffmpegArgs });
+
+  logger.info('Adding compression for video');
+  logger.debug('Spawning ffmpeg for video compression', { cmd: 'ffmpeg', args: ffmpegArgs });
   await new Promise((resolve, reject) => {
     const ffmpeg = spawn('ffmpeg', ffmpegArgs);
-    ffmpeg.stdout.on('data', (data) => logger.info('ffmpeg compress stdout', { data: data.toString() }));
-    ffmpeg.stderr.on('data', (data) => logger.info('ffmpeg compress stderr', { data: data.toString() }));
+    ffmpeg.stdout.on('data', (data) => logger.debug('ffmpeg compress stdout', { data: data.toString() }));
+    ffmpeg.stderr.on('data', (data) => logger.debug('ffmpeg compress stderr', { data: data.toString() }));
     ffmpeg.on('close', (code) => {
-      logger.info('ffmpeg compress process closed', { code });
+      logger.debug('ffmpeg compress process closed', { code });
       if (code === 0) {
-        logger.info('Compressed video to tmp', { tmpCompressedPath });
+        logger.debug('Compressed video to tmp', { tmpCompressedPath });
         resolve(true);
       } else {
         logger.error('ffmpeg video compression failed');
@@ -84,18 +91,18 @@ export async function handleDownload(blobId: string, mediaUrl: string, blobServi
   const finalAudioBlobName = `${blobId}-audio.mp3`;
   const audioBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(finalAudioBlobName);
   const tmpAudioPath = path.join(os.tmpdir(), `${blobId}-audio.mp3`);
-  logger.info('Spawning ffmpeg to extract audio from video', {
+  logger.debug('Spawning ffmpeg to extract audio from video', {
     cmd: 'ffmpeg',
     args: ['-y', '-i', tmpVideoPath, '-vn', '-acodec', 'libmp3lame', tmpAudioPath]
   });
   await new Promise((resolve, reject) => {
     const ffmpeg = spawn('ffmpeg', ['-y', '-i', tmpVideoPath, '-vn', '-acodec', 'libmp3lame', tmpAudioPath]);
-    ffmpeg.stdout.on('data', (data) => logger.info('ffmpeg stdout', { data: data.toString() }));
-    ffmpeg.stderr.on('data', (data) => logger.info('ffmpeg stderr', { data: data.toString() }));
+    ffmpeg.stdout.on('data', (data) => logger.debug('ffmpeg stdout', { data: data.toString() }));
+    ffmpeg.stderr.on('data', (data) => logger.debug('ffmpeg stderr', { data: data.toString() }));
     ffmpeg.on('close', (code) => {
-      logger.info('ffmpeg process closed', { code });
+      logger.debug('ffmpeg process closed', { code });
       if (code === 0) {
-        logger.info('Extracted audio to tmp', { tmpAudioPath });
+        logger.debug('Extracted audio to tmp', { tmpAudioPath });
         resolve(true);
       } else {
         logger.error('ffmpeg audio extraction failed');
@@ -111,7 +118,7 @@ export async function handleDownload(blobId: string, mediaUrl: string, blobServi
     logger.error(`Extracted audio file does not exist: ${tmpAudioPath}`);
     throw new Error('Extracted audio file does not exist');
   }
-  logger.info('Uploading audio to blob', { tmpAudioPath, blobName: finalAudioBlobName });
+  logger.debug('Uploading audio to blob', { tmpAudioPath, blobName: finalAudioBlobName });
   await audioBlob.uploadFile(tmpAudioPath);
   logger.info('Uploaded audio to blob', { blobName: finalAudioBlobName });
 
@@ -120,17 +127,26 @@ export async function handleDownload(blobId: string, mediaUrl: string, blobServi
   const audioSasUrl = await generateBlobSasUrl(audioBlob);
   return {
     video: videoSasUrl,
-    audio: audioSasUrl
+    audio: audioSasUrl,
+    tmpCompressedPath
   };
 }
 
-export async function handleDownloadThumbnail(blobId: string, thumbUrl: string, blobServiceClient: any, containerName: string) {
+export async function handleDownloadThumbnail(blobId: string, thumbUrl: string, containerName: string) {
+  
+  const blobServiceClient = getBlobServiceClient();
   if (!blobServiceClient) {
     throw new Error('Missing Azure Storage connection string');
   }
   const finalThumbBlobName = `${blobId}-thumbnail.jpg`;
   const thumbBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(finalThumbBlobName);
-  const response = await axios.get(thumbUrl, { responseType: 'stream' });
+  const response = await axios.get(thumbUrl, {
+    responseType: 'stream',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+      'Referer': 'https://www.tiktok.com/'
+    }
+  });
   await thumbBlob.uploadStream(response.data);
   // Generate SAS token for thumbnail blob
   const thumbSasUrl = await generateBlobSasUrl(thumbBlob);

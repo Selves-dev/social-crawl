@@ -126,11 +126,11 @@ export class SecurityManager {
  * Get security configuration from environment variables
  */
 export function getSecurityConfigFromEnv(): SecurityConfig {
-  const apiToken = process.env["API-TOKEN"]
-  const messageSecurityToken = process.env["MESSAGE-SECURITY-TOKEN"]
-  const apiTokenHeaderName = process.env["API-TOKEN-HEADER-NAME"] || 'x-api-token'
-  const messageTokenProperty = process.env["MESSAGE-TOKEN-PROPERTY"] || 'securityToken'
-  const enableApiSecurity = process.env["ENABLE-API-SECURITY"] !== 'false'
+  const apiToken = process.env["taash-secret"]
+  const messageSecurityToken = process.env["message-security-token"]
+  const apiTokenHeaderName = process.env["api-token-header-name"] || 'x-api-token'
+  const messageTokenProperty = process.env["message-token-property"] || 'securityToken'
+  const enableApiSecurity = process.env["enable-api-security"] !== 'false'
 
   if (!apiToken || !messageSecurityToken) {
     throw new Error('Security tokens not configured. Please set API_TOKEN and MESSAGE_SECURITY_TOKEN environment variables.')

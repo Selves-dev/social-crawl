@@ -25,7 +25,7 @@ export function buildAnalysisPrompt(blobJson: any, workflow: any): string {
     '### FIELD DEFINITIONS & RULES ###',
     '* **caption**: From blobJson.caption or fallback to adminTitle. Tidy: remove excess whitespace, line breaks, emojis, redundant punctuation, slogans, external links. Focus on clean narrative.',
     '* **mediaDescription**: Long, objective, detailed summary of distinct visual elements and actions in storyboard images. Only what is seen. No opinions or subjective interpretations.',
-    '* **likeCount**: (number) Copy directly from blobJson. If not present or invalid, use null.',
+    '* **likeCount**: (number) Copy directly from blobJson.If not present or invalid, use null.',
     '* **viewCount**: (number) Copy directly from blobJson. If not present or invalid, use null.',
     '* **places**: (array of objects) Specific, bookable venues/businesses, or well-defined landmarks that are distinct points of interest (e.g., hotels, restaurants, museums, specific bridges, specific towers). Each object must have:',
     '    * **name**: (string) The name of the place.',
@@ -35,10 +35,10 @@ export function buildAnalysisPrompt(blobJson: any, workflow: any): string {
     '    * **name**: (string) The name of the location.',
     '    * **confidence**: (float 0.0-1.0) Confidence score; 1.0 for visual certainty.',
     '    * **Prioritization**: Clear visual identification > Contextual refinement (using blobJson context, query) > Textual fallback (caption, adminTitle).',
-    '* **context**: (object) Provides high-level geographic and keyword context.',
-    '    * **l**: (string) The most prominent identified location (e.g., "London", "Lofoten"). Prioritize `Locations` then `Places`. If multiple, pick the most specific or central. If none, extract from `caption` or `adminTitle`. Use "" if truly unknown.',
-    '    * **cc**: (string) The two-letter country code (ISO 3166-1 alpha-2) for the primary location (e.g., "GB" for Great Britain, "NO" for Norway). Prioritize `Locations` then `Places`. If none, infer from `caption` or `adminTitle`. Use "" if truly unknown.',
-    '    * **w**: (string) A space-separated list of highly relevant keywords or tags summarizing the content. Include words from `caption` hashtags, `adminTitle`, and key visual themes identified in `mediaDescription`.',
+    '* **context**: (object) Provides high-level geographic and keyword context. **IMPORTANT: The values for this object are provided in the WORKFLOW CONTEXT and MUST be copied directly.**',
+    '    * **l**: (string) **CRITICAL RULE:** Copy this value **directly** from the `workflow.l` field in the WORKFLOW CONTEXT input. **DO NOT** derive, infer, or change this value based on your analysis of the blobJson.',
+    '    * **cc**: (string) **CRITICAL RULE:** Copy this value **directly** from the `workflow.cc` field in the WORKFLOW CONTEXT input. **DO NOT** derive, infer, or change this value.',
+    '    * **w**: (string) **CRITICAL RULE:** Copy this value **directly** from the `workflow.w` field in the WORKFLOW CONTEXT input. **DO NOT** create a new list of keywords.',
     '* **Default Values**: If a field value cannot be determined and no specific rule applies, use null. Do not invent info.',
     '',
     '### CRITICAL OUTPUT FORMAT RULES ###',
@@ -60,7 +60,7 @@ export function buildAnalysisPrompt(blobJson: any, workflow: any): string {
  * @param payload - The object containing venue data, typically as `payload.venue`.
  * @returns A formatted string prompt for the AI.
  */
-export function buildVenueBasicsPrompt(payload: any): string {
+export function buildVenueBasicsPrompt(payload: any, workflow?: any): string {
   return [
     'You are an expert at extracting structured information from venue data.',
     '',
@@ -82,6 +82,10 @@ export function buildVenueBasicsPrompt(payload: any): string {
     JSON.stringify(payload, null, 2),
     '--- END PAYLOAD ---',
     '',
+    workflow ? '--- WORKFLOW CONTEXT ---' : '',
+    workflow ? JSON.stringify(workflow, null, 2) : '',
+    workflow ? '--- END WORKFLOW CONTEXT ---' : '',
+    '',
     'If a field cannot be determined, use an empty string or empty array as appropriate.',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }

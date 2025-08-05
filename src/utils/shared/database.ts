@@ -1,37 +1,3 @@
-/**
- * Retrieve a venue by address and postcode
- */
-export async function getVenue(name: string, address: string, postcode: string): Promise<Venue | null> {
-  const collection = db.getCollection<Venue>('venues');
-  return await collection.findOne({
-    name,
-    'location.address': address,
-    'location.postcode': postcode
-  });
-}
-import type { Venue } from './types';
-export async function saveVenue(venue: Venue) {
-  const collection = db.getCollection<Venue>('venues');
-  // Use name+address+postcode as unique identifier for upsert
-  const filter = {
-    name: venue.name,
-    'location.address': venue.location.address,
-    'location.postcode': venue.location.postcode
-  };
-  const result = await collection.replaceOne(filter, venue, { upsert: true });
-  logger.info('Saved venue to DB', {
-    name: venue.name,
-    address: venue.location.address,
-    postcode: venue.location.postcode,
-    upserted: result.upsertedId,
-    modified: result.modifiedCount
-  });
-  return result;
-}
-/**
- * MongoDB Atlas Database Connection
- * Handles database connections with connection pooling
- */
 
 import { MongoClient, Db, MongoClientOptions } from 'mongodb'
 import type { Document } from 'mongodb'
@@ -53,14 +19,16 @@ class DatabaseManager {
    * Get database configuration from environment
    */
   private getConfig(): DatabaseConfig {
-    const uri = process.env["MONGODB-URI"]
+    const uri = process.env["mongodb-uri"];
     if (!uri) {
-      throw new Error('MONGODB-URI environment variable is required')
+      throw new Error('mongodb-uri environment variable is required');
     }
 
-    // Extract database name from URI, with fallback
-    const dbNameMatch = uri.match(/\.net\/([^?]+)/)
-    const databaseName = dbNameMatch?.[1] || 'ta_crawler'
+    // Get database name directly from env for Cosmos DB
+    const databaseName = process.env['db-name'];
+    if (!databaseName) {
+      throw new Error('db-name environment variable is required');
+    }
 
     const config: DatabaseConfig = {
       uri,
@@ -72,9 +40,9 @@ class DatabaseManager {
         retryWrites: true,
         w: 'majority'
       }
-    }
+    };
 
-    return config
+    return config;
   }
 
   /**
@@ -194,32 +162,3 @@ export const db = new DatabaseManager()
 // Export types
 export { Db, Collection, MongoClient } from 'mongodb'
 
-export async function savePerspective(perspective: Perspective) {
-  const collection = db.getCollection<Perspective>('perspectives');
-  
-  // Use mediaId as the unique identifier for upsert operations
-  // This way MongoDB will generate _id automatically for new documents
-  const result = await collection.replaceOne(
-    { mediaId: perspective.mediaId }, 
-    perspective, 
-    { upsert: true }
-  );
-  
-  logger.info('Saved perspective to DB', { 
-    mediaId: perspective.mediaId,
-    upserted: result.upsertedId,
-    modified: result.modifiedCount 
-  });
-}
-
-export async function getPerspective(_id: string): Promise<Perspective | null> {
-  const collection = db.getCollection<Perspective>('perspectives');
-  // Ensure _id is an ObjectId for MongoDB queries
-  const { ObjectId } = await import('mongodb');
-  let objectId: any = _id;
-  // Only convert if _id is a string and valid ObjectId
-  if (typeof _id === 'string' && /^[a-fA-F0-9]{24}$/.test(_id)) {
-    objectId = new ObjectId(_id);
-  }
-  return await collection.findOne({ _id: objectId });
-}
