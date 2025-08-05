@@ -18,8 +18,8 @@ COPY package*.json pnpm-lock.yaml* ./
 # Install only production dependencies
 RUN pnpm install --prod --frozen-lockfile && pnpm store prune
 
-# Copy built application
-COPY dist/ ./dist/
+    # Copy built application
+    COPY builds/prod/dist/ ./dist/
 
 
 # Change ownership to non-root user
