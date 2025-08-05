@@ -67,6 +67,7 @@ function mapInstagramHtmlToCrawlSearchResult(html: string): CrawlSearchResult | 
         likeCount,
         thumbnail: thumbnailUrl,
         date: publishDate,
+        source: 'instagram', // Set platform as source
     };
 
     logger.debug('Final Mapped Result', { result });

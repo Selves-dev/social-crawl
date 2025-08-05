@@ -93,6 +93,7 @@ function mapTikTokVideoData(videoData: TikTokVideoData): CrawlSearchResult | nul
       likeCount: videoData.stats?.diggCount || undefined,
       thumbnail: videoData.video?.cover || '',
       date,
+      source: 'tiktok', // Set platform as source
     };
 
     logger.debug('TikTok parser: Successfully mapped video', { result });

@@ -108,6 +108,19 @@ export async function handleStoryboard(
         ]
       };
       
+      // Debug: Log the group blob JSON to see what fields are preserved
+      logger.debug('[handleStoryboard] Group blob JSON fields', {
+        groupIndex: i,
+        mediaId: groupBlobJson.mediaId,
+        id: groupBlobJson.id,
+        permalink: groupBlobJson.permalink,
+        link: groupBlobJson.link,
+        platform: groupBlobJson.platform,
+        source: groupBlobJson.source,
+        hasOriginalBlobJson: !!originalBlobJson,
+        originalKeys: originalBlobJson ? Object.keys(originalBlobJson) : []
+      });
+      
       // Upload the group blob JSON
       const groupBlobName = `${assetBaseName}-group-${i}.json`;
       const groupBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(groupBlobName);

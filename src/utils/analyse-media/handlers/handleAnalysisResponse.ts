@@ -77,12 +77,17 @@ export async function handleAnalysisResponse(message: any) {
     source: '',
     username: '',
     adminTitle: '',
-    slug: '',
     date: ''
   };
 
   try {
-    const blobUrl = message?.payload?.mediaUrl || message?.payload?.blobUrl;
+    // The AI service response wraps the original request in payload.request
+    // Original blobUrl is in payload.request.payload.mediaUrl or payload.request.payload.blobUrl
+    const blobUrl = message?.payload?.mediaUrl || 
+                   message?.payload?.blobUrl ||
+                   message?.payload?.request?.payload?.mediaUrl ||
+                   message?.payload?.request?.payload?.blobUrl;
+                   
     if (blobUrl) {
       const blobJson = await getBlobJson(blobUrl);
       blobFields = {
@@ -91,13 +96,24 @@ export async function handleAnalysisResponse(message: any) {
         source: blobJson.platform || blobJson.source || '',
         username: blobJson.username || '',
         adminTitle: blobJson.adminTitle || blobJson.title || '',
-        slug: blobJson.slug || '',
         date: blobJson.date || blobJson.publishDate || new Date().toISOString().slice(0, 10)
       };
-      logger.debug('[handleAnalysisResponse] Extracted blob fields', { blobFields });
+      logger.debug('[handleAnalysisResponse] Extracted blob fields', { 
+        blobFields,
+        availableFields: {
+          mediaId: blobJson.mediaId,
+          id: blobJson.id,
+          permalink: blobJson.permalink,
+          link: blobJson.link,
+          platform: blobJson.platform,
+          source: blobJson.source,
+          allKeys: Object.keys(blobJson)
+        }
+      });
     } else {
       logger.warn('[handleAnalysisResponse] No blobUrl found in message payload', { 
-        payload: message?.payload 
+        payload: message?.payload,
+        requestPayload: message?.payload?.request?.payload
       });
     }
   } catch (err) {
@@ -107,6 +123,7 @@ export async function handleAnalysisResponse(message: any) {
   const perspective = {
     ...rest,
     ...blobFields, // Include mediaId, permalink, source, etc. from blob
+    slug: aiResult.slug || '', // Get slug from AI response, not blob
     mediaDescription: rest.mediaDescription ? [rest.mediaDescription] : [],
     audioDescription: [],
     context: perspectiveContext,

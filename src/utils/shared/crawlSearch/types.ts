@@ -9,6 +9,7 @@ export interface CrawlSearchResult {
   thumbnail?: string;
   likeCount?: number | null;
   viewCount?: number | null;
+  source?: string; // Platform source (youtube, tiktok, instagram, etc.)
   [key: string]: any; // For parser-specific fields
 }
 // --- YouTube parser types ---
