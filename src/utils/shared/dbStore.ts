@@ -20,10 +20,11 @@ export async function savePerspectiveFull(perspective: Perspective) {
 
 /**
  * Smart upsert for perspectives that appends to arrays and preserves existing data
+ * Uses mediaId as the unique identifier since each media item should have its own perspective
  */
 export async function upsertPerspectiveSmartly(newPerspective: Perspective) {
   const collection = db.getCollection<Perspective>('perspectives');
-  const existing = await collection.findOne({ permalink: newPerspective.permalink });
+  const existing = await collection.findOne({ mediaId: newPerspective.mediaId });
   
   if (existing) {
     // Merge arrays intelligently
@@ -70,8 +71,9 @@ export async function upsertPerspectiveSmartly(newPerspective: Perspective) {
       updatedAt: new Date().toISOString()
     };
     
-    const result = await collection.replaceOne({ permalink: newPerspective.permalink }, updatedPerspective);
+    const result = await collection.replaceOne({ mediaId: newPerspective.mediaId }, updatedPerspective);
     logger.info('Smart upserted perspective to DB', {
+      mediaId: newPerspective.mediaId,
       permalink: newPerspective.permalink,
       mediaDescriptions: mediaDescriptions.length,
       places: places.length,
@@ -93,6 +95,7 @@ export async function upsertPerspectiveSmartly(newPerspective: Perspective) {
     
     const result = await collection.insertOne(newDoc);
     logger.info('Created new perspective with smart upsert', {
+      mediaId: newPerspective.mediaId,
       permalink: newPerspective.permalink,
       insertedId: result.insertedId
     });
@@ -103,6 +106,11 @@ export async function upsertPerspectiveSmartly(newPerspective: Perspective) {
 export async function findPerspectiveByPermalink(permalink: string): Promise<Perspective | null> {
   const collection = db.getCollection<Perspective>('perspectives');
   return await collection.findOne({ permalink });
+}
+
+export async function findPerspectiveByMediaId(mediaId: string): Promise<Perspective | null> {
+  const collection = db.getCollection<Perspective>('perspectives');
+  return await collection.findOne({ mediaId });
 }
 
 export async function addQueryToPerspective(permalink: string, query: string, newPerspective?: Perspective): Promise<void> {

@@ -1,5 +1,6 @@
 import { logger } from '../../shared/logger';
 import { addQueryToPerspective, savePerspectiveFull, upsertPerspectiveSmartly } from '../../shared/dbStore';
+import { getBlobJson } from '../../shared/azureBlob';
 
 export async function handleAnalysisResponse(message: any) {
   // Support message.payload.result as the primary AI response location
@@ -68,8 +69,44 @@ export async function handleAnalysisResponse(message: any) {
             ? [workflowContext.w]
             : [],
   };
+
+  // Fetch blob JSON to get mediaId, permalink, and source
+  let blobFields = {
+    mediaId: '',
+    permalink: '',
+    source: '',
+    username: '',
+    adminTitle: '',
+    slug: '',
+    date: ''
+  };
+
+  try {
+    const blobUrl = message?.payload?.mediaUrl || message?.payload?.blobUrl;
+    if (blobUrl) {
+      const blobJson = await getBlobJson(blobUrl);
+      blobFields = {
+        mediaId: blobJson.mediaId || blobJson.id || '',
+        permalink: blobJson.link || blobJson.permalink || '',
+        source: blobJson.platform || blobJson.source || '',
+        username: blobJson.username || '',
+        adminTitle: blobJson.adminTitle || blobJson.title || '',
+        slug: blobJson.slug || '',
+        date: blobJson.date || blobJson.publishDate || new Date().toISOString().slice(0, 10)
+      };
+      logger.debug('[handleAnalysisResponse] Extracted blob fields', { blobFields });
+    } else {
+      logger.warn('[handleAnalysisResponse] No blobUrl found in message payload', { 
+        payload: message?.payload 
+      });
+    }
+  } catch (err) {
+    logger.error('[handleAnalysisResponse] Failed to fetch blob JSON for perspective fields', err as Error);
+  }
+
   const perspective = {
     ...rest,
+    ...blobFields, // Include mediaId, permalink, source, etc. from blob
     mediaDescription: rest.mediaDescription ? [rest.mediaDescription] : [],
     audioDescription: [],
     context: perspectiveContext,
