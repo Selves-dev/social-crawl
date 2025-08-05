@@ -84,7 +84,7 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
       }
 
       logger.debug(`[crawlSearch] (Google) Raw HTML length: ${htmlToParse.length}`);
-      const links = parseGoogleHtml(htmlToParse, googleUrl).map(r => r.link);
+      const links = parseGoogleHtml(htmlToParse, input).map(r => r.link);
 
       logger.debug(`[crawlSearch] Parsed ${links.length} links for platform: ${platform}`);
 

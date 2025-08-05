@@ -73,7 +73,10 @@ export function parseGoogleHtml(data: any, query: string): CrawlSearchResult[] {
   logger.debug('parseHtml found URLs:', resultUrls);
 
   // Perspective DB logic: check if each URL is already in the perspectives collection
-  checkPerspectivesExist(resultUrls, query);
+  // Note: This runs async without await to avoid blocking the search results return
+  checkPerspectivesExist(resultUrls, query).catch(err => {
+    logger.error('Error in background checkPerspectivesExist:', err as Error);
+  });
 
   return resultUrls.map(url => {
     // Extract platform from URL
