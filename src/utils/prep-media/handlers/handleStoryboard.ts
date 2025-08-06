@@ -181,7 +181,7 @@ export async function extractVideoSegments(tmpVideoPath: string, segmentDir: str
   if (!fs.existsSync(blankImagePath)) {
     logger.info('Creating blank image', { blankImagePath });
     // Use ffmpeg to create a blank white image 180x320
-    const { spawnSync } = require('child_process');
+    const { spawnSync } = await import('child_process');
     spawnSync('ffmpeg', ['-f', 'lavfi', '-i', 'color=c=white:s=180x320', '-frames:v', '1', blankImagePath]);
   }
   const ffmpegArgs = [
