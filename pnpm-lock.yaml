@@ -50,6 +50,9 @@ dependencies:
   sharp:
     specifier: ^0.34.3
     version: 0.34.3
+  string-similarity:
+    specifier: ^4.0.4
+    version: 4.0.4
   zenrows:
     specifier: ^2.0.1
     version: 2.0.1
@@ -5085,6 +5088,11 @@ packages:
       text-decoder: 1.2.3
     optionalDependencies:
       bare-events: 2.6.0
+    dev: false
+
+  /string-similarity@4.0.4:
+    resolution: {integrity: sha512-/q/8Q4Bl4ZKAPjj8WerIBJWALKkaPRfrvhfF8k/B23i4nzrlRj2/go1m90In7nG/3XDSbOo0+pu6RvCTM9RGMQ==}
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
     dev: false
 
   /string-width@4.2.3:
