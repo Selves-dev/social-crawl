@@ -27,20 +27,25 @@ export async function handleDownload(blobId: string, mediaUrl: string, container
   
   await new Promise((resolve, reject) => {
     const video = spawn('yt-dlp', ['-f', 'best', '-o', tmpVideoPath, mediaUrl]);
+    let stderr = '';
     video.stdout.on('data', (data) => logger.debug('yt-dlp video stdout', { data: data.toString() }));
-    video.stderr.on('data', (data) => logger.debug('yt-dlp video stderr', { data: data.toString() }));
+    video.stderr.on('data', (data) => {
+      const msg = data.toString();
+      stderr += msg;
+      logger.debug('yt-dlp video stderr', { data: msg });
+    });
     video.on('close', (code) => {
       logger.debug('yt-dlp video process closed', { code });
       if (code === 0) {
         logger.debug('Downloaded video to tmp', { tmpVideoPath });
         resolve(true);
       } else {
-        logger.error('yt-dlp video download failed');
-        reject(new Error('yt-dlp video download failed'));
+        logger.error(`yt-dlp video download failed for url: ${mediaUrl} (code: ${code})\nstderr: ${stderr}`);
+        reject(new Error(`yt-dlp video download failed for url: ${mediaUrl} (code: ${code})\nstderr: ${stderr}`));
       }
     });
     video.on('error', (err) => {
-      logger.error(err instanceof Error ? err.message : String(err));
+      logger.error(`yt-dlp process error for url: ${mediaUrl} - ${err instanceof Error ? err.message : String(err)}`);
       reject(err);
     });
   });
