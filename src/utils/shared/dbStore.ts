@@ -1,6 +1,7 @@
 import { db } from './database';
 import { logger } from './logger';
 import type { Perspective, Venue } from './types';
+import stringSimilarity from 'string-similarity';
 
 /**
  * Upsert a full perspective document (overwrite or create)
@@ -42,22 +43,41 @@ export async function upsertPerspectiveSmartly(newPerspective: Perspective) {
       });
     }
     
-    // Merge venues (avoid duplicates by name)
+    // Merge venues (fuzzy match with confidence score)
     if (Array.isArray(newPerspective.venues)) {
       newPerspective.venues.forEach(venue => {
-        // Use strict match on address/postcode, fuzzy match on name
-        if (!venues.some((v: any) => {
-          const vAddress = v.location?.address;
-          const vPostcode = v.location?.postcode;
-          const venueAddress = (venue as any).location?.address;
-          const venuePostcode = (venue as any).location?.postcode;
-          return (
-            vAddress === venueAddress &&
-            vPostcode === venuePostcode &&
-            v.name && venue.name && v.name.localeCompare(venue.name, undefined, { sensitivity: 'base' }) === 0
+        const venueName = (venue as any).name || '';
+        const venuePostcode = (venue as any).location?.postcode || '';
+        let bestScore = 0;
+        let bestIdx = -1;
+        venues.forEach((v: any, idx: number) => {
+          const vName = v.name || '';
+          const vPostcode = v.location?.postcode || '';
+          // Fuzzy match on name
+          const nameScore = stringSimilarity.compareTwoStrings(
+            vName.toLowerCase(),
+            venueName.toLowerCase()
           );
-        })) {
+          // Fuzzy match on name+postcode if both present
+          let combinedScore = nameScore;
+          if (vPostcode && venuePostcode) {
+            const combinedA = `${vName} ${vPostcode}`.toLowerCase();
+            const combinedB = `${venueName} ${venuePostcode}`.toLowerCase();
+            combinedScore = stringSimilarity.compareTwoStrings(combinedA, combinedB);
+          }
+          const score = Math.max(nameScore, combinedScore);
+          if (score > bestScore) {
+            bestScore = score;
+            bestIdx = idx;
+          }
+        });
+        // If best match is below threshold, treat as new entry
+        if (bestScore < 0.85) {
           venues.push(venue);
+        } else {
+          // Upsert: merge or replace existing venue if needed (optional: can be more sophisticated)
+          // For now, do nothing (skip adding duplicate)
+          logger.info('Venue upsert: matched existing venue with confidence', { name: venueName, bestScore });
         }
       });
     }
