@@ -21,8 +21,12 @@ RUN pnpm install --prod --frozen-lockfile && pnpm store prune
 RUN npm install --include=optional sharp && \
     npm install --os=linux --libc=musl --cpu=x64 sharp
 
-    # Copy Nitro build output
-    COPY .output/ ./output/
+
+# Copy Nitro build output
+COPY .output/ ./output/
+
+# Copy assets (including blank.jpg) for runtime use
+COPY src/assets/ ./src/assets/
 
 
 # Change ownership to non-root user
