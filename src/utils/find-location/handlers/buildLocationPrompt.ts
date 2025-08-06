@@ -22,7 +22,7 @@ Your task is to complete two steps in order:
 - **CRAWL HISTORY:** This data shows locations we have already searched and how many venues ("vF") we found. Your main goal is to pick a location NOT in this list.
 
 # STEP 1: LOCATION SELECTION FRAMEWORK
-1.  **PRIORITY REGION:** Identify locations in **Europe** that are appealing to **UK travellers**. Focus on interesting cities, neighborhoods, or regions.
+1.  **PRIORITY REGION:** Identify locations in **London** that are appealing to **UK travellers**. Focus on interesting neighborhoods, or areas.
 2.  **EXPLORE NEW LOCATIONS:** Your default action is to select a high-potential location that is NOT in the CRAWL HISTORY.
 3.  **RE-EXPLORE FAILED LOCATIONS:** ONLY if you cannot identify a suitable new location, you may choose from the CRAWL HISTORY, but ONLY if its "vF" is exactly 0.
 4.  **AVOID REPEATING SUCCESSFUL LOCATIONS:** Do not choose any location that already has a high "vF".
@@ -39,13 +39,13 @@ Based on the location you selected, generate **exactly 5 Google-style search que
 2.  A query for finding restaurants, like "places to eat in [Location]".
 3.  A query for finding bars or pubs, like "bars in [Location]".
 4.  A query for finding activities, like "things to do in [Location]".
-5.  A query for finding something unique to buy, like "local crafts in [Location]" or "what to buy in [Location]".
+5.  A query for finding hidden gems, like "hidden gems in [Location]".
 
 **Query Rules:**
--   **BE GENERIC:** Queries must be simple and broad. Avoid specific adjectives like 'boutique', 'craft', 'luxury', or 'hidden gem'.
+-   **BE GENERIC:** Queries must be simple and broad. Avoid specific adjectives like 'boutique', 'craft', 'luxury'.
 -   Do not use hashtags.
--   Focus on finding paid experiences, venues, and services.
--   **EXCLUDE** free activities (e.g., "free walking tour", "parks to visit").
+-   Focus on finding paid experiences, hotels, restaurants, venues, and services.
+-   **EXCLUDE** free activities (e.g., "tower bridge").
 
 # DATA INPUTS
 ## CRAWL HISTORY (l = location, vF = venuesFound)
@@ -68,7 +68,7 @@ ${JSON.stringify(normalizedCrawlData)}
     "restaurants in shoreditch",
     "bars in shoreditch",
     "things to do in shoreditch",
-    "markets in shoreditch"
+    "hidden gems in shoreditch"
   ]
 }
 `;

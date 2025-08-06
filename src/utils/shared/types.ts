@@ -98,6 +98,7 @@ export type BlobManifest = {
 };
 
 export interface Perspective {
+  thumbnail?: string;
   mediaId: string;
   source: string;
   permalink: string;
@@ -105,8 +106,8 @@ export interface Perspective {
   createdAt: string;
   updatedAt: string;
   date: string;
-  adminTitle: string;
-  slug: string;
+  title: string; // Renamed from adminTitle
+  slug: string; // Unique field identifier for web browsing
   caption: string;
   mediaDescription: string[];
   audioDescription: string[];

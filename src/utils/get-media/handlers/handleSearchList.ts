@@ -34,13 +34,13 @@ export async function handleSearchList(message: PostOfficeMessage): Promise<void
         payload: { link }
       });
 
-      // await sendToPostOffice({
-      //   util: 'get-media',
-      //   type: 'get-media',
-      //   apiSecret: process.env['taash-secret'],
-      //   workflow,
-      //   payload: { link }
-      // });
+      await sendToPostOffice({
+        util: 'get-media',
+        type: 'get-media',
+        apiSecret: process.env['taash-secret'],
+        workflow,
+        payload: { link }
+      });
     }
     logger.info(`[search-list] Sent ${parsedResults.length} media scrape jobs to post-office`, { job });
   } catch (error) {

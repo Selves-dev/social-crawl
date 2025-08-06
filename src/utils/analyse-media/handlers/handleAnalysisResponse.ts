@@ -96,7 +96,8 @@ export async function handleAnalysisResponse(message: any) {
         source: blobJson.platform || blobJson.source || '',
         username: blobJson.username || '',
         adminTitle: blobJson.adminTitle || blobJson.title || '',
-        date: blobJson.date || blobJson.publishDate || new Date().toISOString().slice(0, 10)
+        date: blobJson.date || blobJson.publishDate || new Date().toISOString().slice(0, 10),
+        thumbnail: blobJson.thumbnail || blobJson.thumbnailUrl || blobJson.thumb || ''
       };
       logger.debug('[handleAnalysisResponse] Extracted blob fields', { 
         blobFields,
@@ -121,12 +122,23 @@ export async function handleAnalysisResponse(message: any) {
   }
 
   const perspective = {
-    ...rest,
-    ...blobFields, // Include mediaId, permalink, source, etc. from blob
-    slug: aiResult.slug || '', // Get slug from AI response, not blob
+    // _id is omitted here; MongoDB will add it automatically if not present
+    caption: rest.caption || '',
     mediaDescription: rest.mediaDescription ? [rest.mediaDescription] : [],
-    audioDescription: [],
+    likeCount: rest.likeCount ?? null,
+    viewCount: rest.viewCount ?? null,
+    places: rest.places ?? [],
+    locations: rest.locations ?? [],
     context: perspectiveContext,
+    mediaId: blobFields.mediaId || '',
+    permalink: blobFields.permalink || '',
+    source: blobFields.source || '',
+    username: blobFields.username || '',
+    title: blobFields.adminTitle || rest.title || '',
+    date: blobFields.date || '',
+    slug: rest.slug || '',
+    thumbnail: blobFields.thumbnail || '',
+    audioDescription: rest.audioDescription ?? [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
