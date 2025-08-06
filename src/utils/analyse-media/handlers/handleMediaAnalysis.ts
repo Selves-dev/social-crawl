@@ -38,7 +38,7 @@ export async function handleAnalyseMedia(message: PostOfficeMessage) {
       mediaUrl: blobUrl,
       responseHandler: {
         util: 'analyse-media',
-        type: 'ai-response'
+        type: 'am-response'
       }
     }
   };

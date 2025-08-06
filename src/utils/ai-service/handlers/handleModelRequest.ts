@@ -22,6 +22,7 @@ interface AIResponse {
   error?: boolean;
   message?: string;
   raw?: any;
+  mediaUrl?: string;
 }
 
 // Main request handlers
@@ -31,7 +32,10 @@ export async function handleTextRequest(msg: any): Promise<AIResponse> {
     const aiReq: AIRequest = msg.payload || msg; // Accept either PostOfficeMessage or AIRequest
     logger.debug('[handleTextRequest] Received AIRequest', { aiReq });
     const messages = [{ role: 'user', content: aiReq.prompt }];
-    return await fetchOpenAIResponse(messages, aiReq.options || {});
+    const aiResponse = await fetchOpenAIResponse(messages, aiReq.options || {});
+    
+    // Add mediaUrl to the AI response and include the original message
+    return aiResponse;
   } catch (error) {
     logger.error('[handleTextRequest] Error processing text request:', error as Error);
     return createErrorResponse(error);
@@ -40,7 +44,7 @@ export async function handleTextRequest(msg: any): Promise<AIResponse> {
 
 export async function handleTextImageRequest(msg: any): Promise<AIResponse> {
   try {
-    logger.info('[handleTextImageRequest] Processing text+image request');
+    logger.debug('[handleTextImageRequest] Processing text+image request', { msg });
     const aiReq: AIRequest = msg.payload || msg;
     const content = await buildMessageContent(aiReq.prompt, aiReq.mediaUrl);
     const messages = [{ role: 'user', content }];
@@ -98,7 +102,7 @@ async function fetchOpenAIResponse(messages: any[], options: { maxTokens?: numbe
     });
 
     const data = response.data;
-    logger.debug('[fetchOpenAIResponse] API response', { data });
+    logger.info('[fetchOpenAIResponse] API response', { data });
     const text = data.choices?.[0]?.message?.content || '';
 
     if (!text) {
@@ -107,13 +111,12 @@ async function fetchOpenAIResponse(messages: any[], options: { maxTokens?: numbe
 
     return {
       text,
-      model: config.deployment,
-      success: !!text,
-      raw: data
+      raw: data,
+      success: !!text
     };
 
   } catch (error) {
-    logger.error('[fetchOpenAIResponse] API request failed:', error);
+    logger.error('[fetchOpenAIResponse] API request failed:', error instanceof Error ? error : undefined);
     throw error;
   }
 }
@@ -131,9 +134,9 @@ async function buildMessageContent(prompt: string, mediaUrl?: string): Promise<a
     logger.debug('[buildMessageContent] Fetching media manifest', { mediaUrl });
     
     const blobJson = await getBlobJson(mediaUrl) as BlobManifest;
-    const media = blobJson?.media || [];
+    const media =  blobJson?.media || [];
 
-    logger.debug('[buildMessageContent] Processing media items', { count: media.length });
+    logger.info('[buildMessageContent] Processing media items', { count: media.length });
 
     for (const item of media) {
       if (!item.url) {
@@ -145,7 +148,7 @@ async function buildMessageContent(prompt: string, mediaUrl?: string): Promise<a
       
       for (const url of urls) {
         if (isImageUrl(url) || isImageType(item.type)) {
-          logger.debug('[buildMessageContent] Adding image to content', { url, type: item.type });
+          logger.info('[buildMessageContent] Adding image to content', { url, type: item.type });
           content.push({ 
             type: 'image_url', 
             image_url: { url } 

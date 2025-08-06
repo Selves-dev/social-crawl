@@ -30,7 +30,7 @@ export async function upsertPerspectiveSmartly(newPerspective: Perspective) {
     // Merge arrays intelligently
     const mediaDescriptions = Array.isArray(existing.mediaDescription) ? existing.mediaDescription : [];
     const audioDescriptions = Array.isArray(existing.audioDescription) ? existing.audioDescription : [];
-    const places = Array.isArray(existing.places) ? existing.places : [];
+    const venues = Array.isArray(existing.venues) ? existing.venues : [];
     const locations = Array.isArray(existing.locations) ? existing.locations : [];
     
     // Add new mediaDescription entries if provided and not already present
@@ -42,11 +42,22 @@ export async function upsertPerspectiveSmartly(newPerspective: Perspective) {
       });
     }
     
-    // Merge places (avoid duplicates by name)
-    if (Array.isArray(newPerspective.places)) {
-      newPerspective.places.forEach(place => {
-        if (!places.some(p => p.name === place.name)) {
-          places.push(place);
+    // Merge venues (avoid duplicates by name)
+    if (Array.isArray(newPerspective.venues)) {
+      newPerspective.venues.forEach(venue => {
+        // Use strict match on address/postcode, fuzzy match on name
+        if (!venues.some((v: any) => {
+          const vAddress = v.location?.address;
+          const vPostcode = v.location?.postcode;
+          const venueAddress = (venue as any).location?.address;
+          const venuePostcode = (venue as any).location?.postcode;
+          return (
+            vAddress === venueAddress &&
+            vPostcode === venuePostcode &&
+            v.name && venue.name && v.name.localeCompare(venue.name, undefined, { sensitivity: 'base' }) === 0
+          );
+        })) {
+          venues.push(venue);
         }
       });
     }
@@ -66,7 +77,7 @@ export async function upsertPerspectiveSmartly(newPerspective: Perspective) {
       ...newPerspective,
       mediaDescription: mediaDescriptions,
       audioDescription: audioDescriptions,
-      places,
+      venues,
       locations,
       updatedAt: new Date().toISOString()
     };
@@ -76,7 +87,7 @@ export async function upsertPerspectiveSmartly(newPerspective: Perspective) {
       mediaId: newPerspective.mediaId,
       permalink: newPerspective.permalink,
       mediaDescriptions: mediaDescriptions.length,
-      places: places.length,
+      venues: venues.length,
       locations: locations.length,
       modified: result.modifiedCount
     });
@@ -87,7 +98,7 @@ export async function upsertPerspectiveSmartly(newPerspective: Perspective) {
       ...newPerspective,
       mediaDescription: Array.isArray(newPerspective.mediaDescription) ? newPerspective.mediaDescription : [],
       audioDescription: Array.isArray(newPerspective.audioDescription) ? newPerspective.audioDescription : [],
-      places: Array.isArray(newPerspective.places) ? newPerspective.places : [],
+      venues: Array.isArray(newPerspective.venues) ? newPerspective.venues : [],
       locations: Array.isArray(newPerspective.locations) ? newPerspective.locations : [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

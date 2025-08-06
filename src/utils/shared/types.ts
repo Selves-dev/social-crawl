@@ -111,7 +111,7 @@ export interface Perspective {
   caption: string;
   mediaDescription: string[];
   audioDescription: string[];
-  places: Array<{ name: string; confidence: number }>;
+  venues: Array<{ name: string; confidence: number }>;
   locations: Array<{ name: string; confidence: number }>;
   context: {
     l: string;

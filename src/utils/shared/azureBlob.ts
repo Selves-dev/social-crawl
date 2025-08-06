@@ -29,7 +29,7 @@ const PLATFORM_PATTERNS = new Map([
   [/google\./, 'google']
 ]);
 
-const DEFAULT_SAS_EXPIRY_MINUTES = 60;
+const DEFAULT_SAS_EXPIRY_MINUTES = 60 * 24 * 7; // 7 days
 const JSON_CONTENT_TYPE = 'application/json';
 
 // Logger utility

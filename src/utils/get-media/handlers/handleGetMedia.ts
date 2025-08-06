@@ -66,7 +66,7 @@ export async function handleGetMedia(message: PostOfficeMessage): Promise<void> 
         apiSecret: process.env['taash-secret'],
         workflow,
         payload: {
-          blobUrl
+          blobUrl,
         }
       });
       

@@ -1,51 +1,43 @@
+import { GoogleGenAI } from '@google/genai'
+import { logger } from '../../shared/logger';
+
 export async function handleSearchRequest(message: any): Promise<any> {
-  const apiKey = process.env["GEMINI_API_KEY"];
+  const apiKey = process.env["gemini-api-key"];
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not set in environment variables");
+    throw new Error("gemini-api-key is not set in environment variables");
   }
 
-  const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
-  const userPrompt = message.prompt || "";
-  const payload = {
-    contents: [
-      {
-        parts: [ { text: userPrompt } ]
-      }
-    ],
-    tools: [
-      { google_search_retrieval: {} }
-    ],
-    generationConfig: {
-      temperature: 0.25,
-    }
-  };
-
+  const ai = new GoogleGenAI({ apiKey });
+  const userPrompt = message?.payload?.prompt || "";
   let text = '';
-  let data: any = null;
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    logger.info('[handleSearchRequest] Prompt:', { userPrompt });
+    const tools = [
+      { googleSearch: {} }
+    ];
+    const config = {
+      temperature: 0.25,
+      thinkingConfig: {
+        thinkingBudget: 0,
       },
-      body: JSON.stringify(payload),
+      tools,
+    };
+    const contents = [
+      {
+        role: 'user',
+        parts: [
+          { text: userPrompt },
+        ],
+      },
+    ];
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      config,
+      contents,
     });
-
-    data = await response.json();
-    if (data && data.candidates?.[0]?.content?.parts) {
-      text = data.candidates[0].content.parts.map((p: any) => p.text).join('') || '';
-    } else {
-      text = '';
-    }
+    text = result.text || '';
   } catch (err) {
-    // Log error but do not throw
-    // eslint-disable-next-line no-console
-    console.error('[Gemini API] Error:', err);
+    logger.error('[handleSearchRequest] GenAI API Error:', err instanceof Error ? err : new Error(String(err)));
   }
-  return {
-    text,
-    model: 'gemini-2.5-flash-lite',
-    success: !!text,
-    raw: data
-  };
+  return text;
 }

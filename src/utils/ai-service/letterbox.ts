@@ -59,8 +59,8 @@ export function startAIServiceIntray() {
         apiSecret: process.env['taash-secret'],
         workflow,
         payload: {
-          request: message,
-          result
+          result,
+          mediaUrl: payload?.mediaUrl,
         }
       });
       logger.info('[AI-Service-Intray] Response sent to PostOffice');

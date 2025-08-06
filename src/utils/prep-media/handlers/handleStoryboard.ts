@@ -98,16 +98,21 @@ export async function handleStoryboard(
   if (originalBlobJson) {
     for (let i = 0; i < storyboardGroups.length; i++) {
       const group = storyboardGroups[i];
-      
-      // Create new blob JSON with this group's storyboards
+      // Prepare media array, filter out old storyboards
+      let mediaArr = [
+        ...(originalBlobJson.media || []).filter((m: any) => m.type !== 'storyboards')
+      ];
+      // Add thumbnail as a media item if present and not already in media
+      if (originalBlobJson.thumbnail && !mediaArr.some((m: any) => m.type === 'thumbnail')) {
+        mediaArr.push({ type: 'thumbnail', url: originalBlobJson.thumbnail });
+      }
+      // Add this group's storyboards
+      mediaArr.push({ type: 'storyboards', url: group.join(',') });
+      // Create new blob JSON with this group's storyboards and thumbnail
       const groupBlobJson = {
         ...originalBlobJson,
-        media: [
-          ...(originalBlobJson.media || []).filter((m: any) => m.type !== 'storyboards'),
-          { type: 'storyboards', url: group.join(',') }
-        ]
+        media: mediaArr
       };
-      
       // Debug: Log the group blob JSON to see what fields are preserved
       logger.debug('[handleStoryboard] Group blob JSON fields', {
         groupIndex: i,
@@ -120,17 +125,14 @@ export async function handleStoryboard(
         hasOriginalBlobJson: !!originalBlobJson,
         originalKeys: originalBlobJson ? Object.keys(originalBlobJson) : []
       });
-      
       // Upload the group blob JSON
       const groupBlobName = `${assetBaseName}-group-${i}.json`;
       const groupBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(groupBlobName);
       await groupBlob.upload(JSON.stringify(groupBlobJson, null, 2), JSON.stringify(groupBlobJson, null, 2).length, {
         blobHTTPHeaders: { blobContentType: 'application/json' }
       });
-      
       const groupBlobUrl = await generateBlobSasUrl(groupBlob);
       groupBlobUrls.push(groupBlobUrl);
-      
       logger.debug('Created group blob JSON', { 
         groupIndex: i, 
         groupSize: group.length, 

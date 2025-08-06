@@ -38,7 +38,7 @@ export function startAnalyseMediaIntray() {
         logger.info('[Analyse-Media-Intray] Routing to handleVenueBasics');
         await handleVenueBasics(message);
         break;
-      case 'ai-response':
+      case 'am-response':
         logger.info('[Analyse-Media-Intray] Routing to handleAiResponse');
         await handleAnalysisResponse(message);
         break;

@@ -1,10 +1,14 @@
 import { logger } from '../../shared/logger';
 import { addQueryToPerspective, savePerspectiveFull, upsertPerspectiveSmartly } from '../../shared/dbStore';
 import { getBlobJson } from '../../shared/azureBlob';
+import { analyseMediaLetterbox } from '../letterbox';
 
 export async function handleAnalysisResponse(message: any) {
+  logger.info('[handleAnalysisResponse] Full message structure (stringified)', { message: JSON.stringify(message, null, 2) });
+  logger.info('[handleAnalysisResponse] Top-level keys', { keys: Object.keys(message || {}) });
+
   // Support message.payload.result as the primary AI response location
-  const response = message?.payload?.result ?? message?.result ?? message?.payload?.response ?? message?.response;
+  const response = message?.payload?.result;
   logger.debug('[handleAnalysisResponse] Received AI response', { response });
   // Debug: log raw response text if present
   if (typeof response?.text === 'string') {
@@ -61,13 +65,9 @@ export async function handleAnalysisResponse(message: any) {
     cc: aiContext.cc ?? workflowContext.cc ?? '',
     w: Array.isArray(aiContext.w)
       ? aiContext.w
-      : aiContext.w !== undefined
-        ? [aiContext.w]
-        : Array.isArray(workflowContext.w)
-          ? workflowContext.w
-          : workflowContext.w !== undefined
-            ? [workflowContext.w]
-            : [],
+      : Array.isArray(workflowContext.w)
+        ? workflowContext.w
+        : [],
   };
 
   // Fetch blob JSON to get mediaId, permalink, and source
@@ -82,41 +82,21 @@ export async function handleAnalysisResponse(message: any) {
   };
 
   try {
-    // The AI service response wraps the original request in payload.request
-    // Original blobUrl is in payload.request.payload.mediaUrl or payload.request.payload.blobUrl
-    const blobUrl = message?.payload?.mediaUrl || 
-                   message?.payload?.blobUrl ||
-                   message?.payload?.request?.payload?.mediaUrl ||
-                   message?.payload?.request?.payload?.blobUrl;
-                   
+    const blobUrl = message?.payload?.mediaUrl;
     if (blobUrl) {
       const blobJson = await getBlobJson(blobUrl);
       blobFields = {
-        mediaId: blobJson.mediaId || blobJson.id || '',
-        permalink: blobJson.link || blobJson.permalink || '',
-        source: blobJson.platform || blobJson.source || '',
+        mediaId: blobJson.mediaId || '',
+        permalink: blobJson.link || '',
+        source: blobJson.source || '',
         username: blobJson.username || '',
-        adminTitle: blobJson.adminTitle || blobJson.title || '',
-        date: blobJson.date || blobJson.publishDate || new Date().toISOString().slice(0, 10),
-        thumbnail: blobJson.thumbnail || blobJson.thumbnailUrl || blobJson.thumb || ''
+        adminTitle: blobJson.title || '',
+        date: blobJson.date || '',
+        thumbnail: blobJson.thumbnail || ''
       };
-      logger.debug('[handleAnalysisResponse] Extracted blob fields', { 
-        blobFields,
-        availableFields: {
-          mediaId: blobJson.mediaId,
-          id: blobJson.id,
-          permalink: blobJson.permalink,
-          link: blobJson.link,
-          platform: blobJson.platform,
-          source: blobJson.source,
-          allKeys: Object.keys(blobJson)
-        }
-      });
+      logger.debug('[handleAnalysisResponse] Extracted blob fields', { blobFields });
     } else {
-      logger.warn('[handleAnalysisResponse] No blobUrl found in message payload', { 
-        payload: message?.payload,
-        requestPayload: message?.payload?.request?.payload
-      });
+      logger.warn('[handleAnalysisResponse] No mediaUrl found in message payload', { payload: message?.payload });
     }
   } catch (err) {
     logger.error('[handleAnalysisResponse] Failed to fetch blob JSON for perspective fields', err as Error);
@@ -128,7 +108,7 @@ export async function handleAnalysisResponse(message: any) {
     mediaDescription: rest.mediaDescription ? [rest.mediaDescription] : [],
     likeCount: rest.likeCount ?? null,
     viewCount: rest.viewCount ?? null,
-    places: rest.places ?? [],
+    venues: rest.venues ?? [],
     locations: rest.locations ?? [],
     context: perspectiveContext,
     mediaId: blobFields.mediaId || '',
@@ -152,5 +132,28 @@ export async function handleAnalysisResponse(message: any) {
     logger.error('Failed to save perspective to database', err as Error);
   }
 
+  // For each venue, queue a venue-basics request
+  if (Array.isArray(perspective.venues)) {
+    for (const venue of perspective.venues) {
+      // Merge l, cc, w from perspective.context into the workflow for downstream context
+      const workflow = {
+        ...message.workflow,
+        l: perspective.context.l,
+        cc: perspective.context.cc,
+        w: perspective.context.w,
+      };
+      const venueBasicsMessage = {
+        util: 'analyse-media',
+        type: 'venue-basics',
+        workflow,
+        apiSecret: process.env['taash-secret'],
+        payload: {
+          venue,
+          mediaId: perspective.mediaId,
+        },
+      };
+      await analyseMediaLetterbox(venueBasicsMessage);
+    }
+  }
   return perspective;
 }

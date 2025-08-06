@@ -13,18 +13,18 @@ export async function handleVenueBasics(message: any): Promise<any> {
   logger.info('[handleVenueBasics] Called with message:', { message });
 
   const prompt = buildVenueBasicsPrompt(message);
-  logger.info('[handleVenueBasics] Built prompt for search service:', { prompt });
+  logger.debug('[handleVenueBasics] Built prompt for search service:', { prompt });
   // Send to search service (ai-service) for further enrichment
   await sendToPostOffice({
     util: 'ai-service',
     type: 'search',
-    apiSecret: process.env['taash-secret'],
+   apiSecret: process.env['taash-secret'],
     workflow: message.workflow,
     payload: {
       prompt,
       responseHandler: {
         util: 'analyse-media',
-        type: 'ai_SearchResponse'
+        type: 'venue-response'
       }
     }
   });
