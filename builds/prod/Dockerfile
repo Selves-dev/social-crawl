@@ -3,7 +3,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install build dependencies for sharp and yt-dlp
-RUN apk add --no-cache --virtual .gyp python3 make g++ libc6-compat py3-pip && pip3 install yt-dlp
+RUN apk add --no-cache --virtual .gyp python3 make g++ libc6-compat py3-pip yt-dlp
 
 # Install pnpm
 RUN npm install -g pnpm
