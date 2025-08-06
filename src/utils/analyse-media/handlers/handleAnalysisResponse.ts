@@ -77,7 +77,8 @@ export async function handleAnalysisResponse(message: any) {
     source: '',
     username: '',
     adminTitle: '',
-    date: ''
+    date: '',
+    thumbnail: ''
   };
 
   try {

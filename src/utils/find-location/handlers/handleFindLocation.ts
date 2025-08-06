@@ -116,10 +116,11 @@ function parseLocationResponse(aiResponse: any): { locationName: string; country
     return { locationName, countryCode, queries };
     
   } catch (parseError) {
-    logger.error('[location-response] Failed to parse AI response JSON', { 
-      text, 
-      error: parseError instanceof Error ? parseError.message : String(parseError) 
-    });
+    logger.error(
+      '[location-response] Failed to parse AI response JSON',
+      parseError instanceof Error ? parseError : new Error(String(parseError)),
+      { responseText: text }
+    );
     return null;
   }
 }

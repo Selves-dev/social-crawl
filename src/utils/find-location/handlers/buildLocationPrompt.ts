@@ -1,3 +1,4 @@
+import { handleLocationData } from './handleLocationData';
 export async function buildLocationInstruction(): Promise<string> {
   // Use 'locations' collection for crawl history
   const { crawlData } = await handleLocationData('locations');
