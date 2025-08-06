@@ -4,8 +4,8 @@ import { getBlobJson } from '../../shared/azureBlob';
 import { analyseMediaLetterbox } from '../letterbox';
 
 export async function handleAnalysisResponse(message: any) {
-  logger.info('[handleAnalysisResponse] Full message structure (stringified)', { message: JSON.stringify(message, null, 2) });
-  logger.info('[handleAnalysisResponse] Top-level keys', { keys: Object.keys(message || {}) });
+  logger.debug('[handleAnalysisResponse] Full message structure (stringified)', { message: JSON.stringify(message, null, 2) });
+  logger.debug('[handleAnalysisResponse] Top-level keys', { keys: Object.keys(message || {}) });
 
   // Support message.payload.result as the primary AI response location
   const response = message?.payload?.result;
@@ -36,7 +36,7 @@ export async function handleAnalysisResponse(message: any) {
     if (aiResult && aiResult.aiResult) {
       aiResult = aiResult.aiResult;
     }
-    logger.info('[handleAnalysisResponse] Parsed AI response (object)', { aiResult });
+    logger.debug('[handleAnalysisResponse] Parsed AI response (object)', { aiResult });
   } else if (typeof message?.text === 'string') {
     try {
       // **CRITICAL FIX:** Clean the string before parsing for this case too
@@ -81,6 +81,7 @@ export async function handleAnalysisResponse(message: any) {
     thumbnail: ''
   };
 
+  let thumbnailUrl = '';
   try {
     const blobUrl = message?.payload?.mediaUrl;
     if (blobUrl) {
@@ -94,7 +95,17 @@ export async function handleAnalysisResponse(message: any) {
         date: blobJson.date || '',
         thumbnail: blobJson.thumbnail || ''
       };
-      logger.debug('[handleAnalysisResponse] Extracted blob fields', { blobFields });
+      // Extract video and thumbnail URLs from media array if present
+      // Just try to find the thumbnail in media, don't check for array
+      try {
+        for (const m of blobJson.media) {
+          if (m.type === 'thumbnail' && m.url) {
+            thumbnailUrl = m.url;
+            break;
+          }
+        }
+      } catch {}
+      logger.debug('[handleAnalysisResponse] Extracted blob fields', { blobFields, thumbnailUrl });
     } else {
       logger.warn('[handleAnalysisResponse] No mediaUrl found in message payload', { payload: message?.payload });
     }
@@ -118,10 +129,12 @@ export async function handleAnalysisResponse(message: any) {
     title: blobFields.adminTitle || rest.title || '',
     date: blobFields.date || '',
     slug: rest.slug || '',
-    thumbnail: blobFields.thumbnail || '',
+    thumbnail: thumbnailUrl || blobFields.thumbnail || '',
     audioDescription: rest.audioDescription ?? [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    mediaUrl: message?.payload?.mediaUrl || '', // Save the uploaded blob URL
+    thumbnailUrl,
   };
   logger.info('[handleAnalysisResponse] Final perspective object', { perspective });
 

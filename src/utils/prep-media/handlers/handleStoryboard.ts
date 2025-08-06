@@ -5,6 +5,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
 import sharp from 'sharp';
+import { compressStoryboardImage } from '../../shared/downloadUtils';
 import { BlobServiceClient } from '@azure/storage-blob';
 import { generateBlobSasUrl } from '../../shared/azureBlob';
 import { getBlobServiceClient } from '../../shared/azureBlob';
@@ -29,17 +30,28 @@ export async function handleStoryboard(
   }
 
   logger.info('handleStoryboard: extracting segments');
+  // Use dynamic dimensions
+  const { width: thumbWidth, height: thumbHeight } = getOutputDimensions(platform, isShorts);
   const segmentDir = path.join(os.tmpdir(), `${assetBaseName}-segments`);
   const segmentPaths = await extractVideoSegments(tmpVideoPath, segmentDir);
   logger.debug('handleStoryboard: segmentPaths', { segmentPaths });
+
+  // Compress each extracted frame for storyboard
+  const compressedDir = path.join(os.tmpdir(), `${assetBaseName}-segments-compressed`);
+  fs.mkdirSync(compressedDir, { recursive: true });
+  const compressedSegmentPaths: string[] = [];
+  for (const framePath of segmentPaths) {
+    const frameName = path.basename(framePath);
+    const compressedPath = path.join(compressedDir, frameName);
+    await compressStoryboardImage(framePath, compressedPath, { width: thumbWidth, height: thumbHeight, quality: 70 });
+    compressedSegmentPaths.push(compressedPath);
+  }
   const gridSize = 4;
-  // Use dynamic dimensions
-  const { width: thumbWidth, height: thumbHeight } = getOutputDimensions(platform, isShorts);
   const blankImagePath = path.resolve(process.cwd(), 'src/assets/blank.jpg');
   const storyboardUrls: string[] = [];
-  for (let i = 0; i < segmentPaths.length; i += gridSize * gridSize) {
+  for (let i = 0; i < compressedSegmentPaths.length; i += gridSize * gridSize) {
     // Get up to gridSize*gridSize images for this grid
-    const gridImages = segmentPaths.slice(i, i + gridSize * gridSize);
+    const gridImages = compressedSegmentPaths.slice(i, i + gridSize * gridSize);
     // Pad with blank frames if needed
     while (gridImages.length < gridSize * gridSize) {
       gridImages.push(blankImagePath);
@@ -182,7 +194,10 @@ export async function extractVideoSegments(tmpVideoPath: string, segmentDir: str
     logger.info('Creating blank image', { blankImagePath });
     // Use ffmpeg to create a blank white image 180x320
     const { spawnSync } = await import('child_process');
-    spawnSync('ffmpeg', ['-f', 'lavfi', '-i', 'color=c=white:s=180x320', '-frames:v', '1', blankImagePath]);
+    const blankArgs = ['-f', 'lavfi', '-i', 'color=c=white:s=180x320', '-frames:v', '1', blankImagePath];
+    logger.info('Spawning ffmpeg for blank image', { blankImagePath, blankArgs });
+    const blankResult = spawnSync('ffmpeg', blankArgs);
+    logger.info('ffmpeg blank image result', { status: blankResult.status, error: blankResult.error, stdout: blankResult.stdout?.toString(), stderr: blankResult.stderr?.toString() });
   }
   const ffmpegArgs = [
     '-hide_banner', '-loglevel', 'error',
@@ -190,22 +205,26 @@ export async function extractVideoSegments(tmpVideoPath: string, segmentDir: str
     '-vf', 'fps=1/2',
     path.join(segmentDir, 'frame_%03d.jpg')
   ];
-  logger.debug('Spawning ffmpeg for segment extraction', { tmpVideoPath, segmentDir, ffmpegArgs });
+  logger.info('Spawning ffmpeg for segment extraction', { tmpVideoPath, segmentDir, ffmpegArgs, exists: fs.existsSync(tmpVideoPath), fileSize: fs.existsSync(tmpVideoPath) ? fs.statSync(tmpVideoPath).size : null });
   await new Promise((resolve, reject) => {
     const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+    ffmpeg.stdout.on('data', (data) => logger.info('ffmpeg stdout', { data: data.toString() }));
+    ffmpeg.stderr.on('data', (data) => logger.info('ffmpeg stderr', { data: data.toString() }));
     ffmpeg.on('close', (code: number) => {
-      logger.debug('ffmpeg process closed', { code });
+      logger.info('ffmpeg process closed', { code });
       if (code === 0) {
         logger.info('Extracted video segments', { segmentDir });
         resolve(true);
       } else {
-      logger.error('ffmpeg segment extraction failed');
-      logger.debug('ffmpeg context', { tmpVideoPath, segmentDir, ffmpegArgs });
-      reject(new Error('ffmpeg segment extraction failed'));
+        logger.error(`ffmpeg segment extraction failed (code ${code})`);
+        logger.debug('ffmpeg segment extraction failed context', { tmpVideoPath, segmentDir, ffmpegArgs });
+        logger.debug('ffmpeg context', { tmpVideoPath, segmentDir, ffmpegArgs });
+        reject(new Error('ffmpeg segment extraction failed'));
       }
     });
     ffmpeg.on('error', (err) => {
-      logger.error('ffmpeg process error: ' + (err instanceof Error ? err.message : String(err)));
+      logger.error(`ffmpeg process error: ${err instanceof Error ? err.message : String(err)}`);
+      logger.debug('ffmpeg process error context', { tmpVideoPath, segmentDir, ffmpegArgs });
       logger.debug('ffmpeg context', { tmpVideoPath, segmentDir, ffmpegArgs });
       reject(err);
     });
@@ -221,7 +240,7 @@ export async function extractVideoSegments(tmpVideoPath: string, segmentDir: str
     })
     .map(f => path.join(segmentDir, f));
   if (files.length === 0) {
-    logger.warn('No frames extracted from video', { tmpVideoPath, segmentDir, ffmpegArgs });
+    logger.warn('No frames extracted from video', { tmpVideoPath, segmentDir, ffmpegArgs, segmentDirFiles: fs.readdirSync(segmentDir) });
   }
   logger.debug('Segment files found', { files });
   return files;

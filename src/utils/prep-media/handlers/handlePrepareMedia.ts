@@ -56,9 +56,9 @@ if (!id) {
     media.push({ type: 'video', url: downloadResults.video });
     media.push({ type: 'audio', url: downloadResults.audio });
     logger.debug('Downloaded and uploaded media', { video: downloadResults.video, audio: downloadResults.audio });
-    if (downloadResults.tmpCompressedPath) {
-      tmpVideoPath = downloadResults.tmpCompressedPath;
-      logger.debug('Updated tmpVideoPath to compressed video', { tmpVideoPath });
+    if (downloadResults.tmpVideoPath) {
+      tmpVideoPath = downloadResults.tmpVideoPath;
+      logger.debug('Updated tmpVideoPath to downloaded video', { tmpVideoPath });
     }
   } catch (err) {
     logger.error('Failed to download and upload media', err instanceof Error ? err : new Error(String(err)));

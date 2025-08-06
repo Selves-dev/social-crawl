@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event);
   console.info('[prep-media test] Starting workflow test', { body });
   // Accept 'blobPath' in the request body, e.g. 'youtube/json/d_1qcZb-S80/1753983592882.json'
-  const blobPath = body?.blobPath || 'tiktok/json/7338157339985464609/1754410487156.json';
+  const blobPath = body?.blobPath || 'instagram/json/DLTKaM6veoc/1754491881763.json';
   const baseUrl = 'https://socialcrawlstorage.blob.core.windows.net/media/';
   const mediaUrl = `${baseUrl}${blobPath}`;
   const workflow = body?.workflow || { batchId: 'test-batch', stage: 'prep-media', timestamp: new Date().toISOString() };

@@ -102,7 +102,7 @@ async function fetchOpenAIResponse(messages: any[], options: { maxTokens?: numbe
     });
 
     const data = response.data;
-    logger.info('[fetchOpenAIResponse] API response', { data });
+    logger.debug('[fetchOpenAIResponse] API response', { data });
     const text = data.choices?.[0]?.message?.content || '';
 
     if (!text) {
@@ -148,7 +148,7 @@ async function buildMessageContent(prompt: string, mediaUrl?: string): Promise<a
       
       for (const url of urls) {
         if (isImageUrl(url) || isImageType(item.type)) {
-          logger.info('[buildMessageContent] Adding image to content', { url, type: item.type });
+          logger.debug('[buildMessageContent] Adding image to content', { url, type: item.type });
           content.push({ 
             type: 'image_url', 
             image_url: { url } 
