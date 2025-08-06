@@ -17,43 +17,32 @@ export async function handleSearchList(message: PostOfficeMessage): Promise<void
 
     const query = job.query;
     const rawResults = await crawlSearch(query);
-    
-    let parsedResults: Record<string, string[]> = {};
+
+    let parsedResults: string[] = [];
     try {
       parsedResults = JSON.parse(rawResults);
     } catch (err) {
       logger.error('[search-list] Failed to parse crawlSearch results as JSON', err instanceof Error ? err : new Error(String(err)));
       return;
     }
-    
-    let totalLinks = 0;
-    for (const platform of Object.keys(parsedResults)) {
-      const links = parsedResults[platform];
-      for (const link of links) {
-        logger.debug('[search-list] Sending job to post-office (sendToPostOffice):', {
-          util: 'get-media',
-          type: 'get-media',
-          workflow: job.workflow,
-          payload: {
-            link,
-            platform
-          }
-        });
-        
-        await sendToPostOffice({
-          util: 'get-media',
-          type: 'get-media',
-          apiSecret: process.env['taash-secret'],
-          workflow,
-          payload: {
-            link,
-            platform
-          }
-        });
-        totalLinks++;
-      }
+
+    for (const link of parsedResults) {
+      logger.debug('[search-list] Sending job to post-office (sendToPostOffice):', {
+        util: 'get-media',
+        type: 'get-media',
+        workflow: job.workflow,
+        payload: { link }
+      });
+
+      // await sendToPostOffice({
+      //   util: 'get-media',
+      //   type: 'get-media',
+      //   apiSecret: process.env['taash-secret'],
+      //   workflow,
+      //   payload: { link }
+      // });
     }
-    logger.info(`[search-list] Sent ${totalLinks} media scrape jobs to post-office`);
+    logger.info(`[search-list] Sent ${parsedResults.length} media scrape jobs to post-office`, { job });
   } catch (error) {
     logger.error('[search-list] Error processing message', error instanceof Error ? error : new Error(String(error)));
   }

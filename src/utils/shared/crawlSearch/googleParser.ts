@@ -4,7 +4,7 @@ import { findPerspectiveByPermalink, addQueryToPerspective } from '../dbStore';
 
 // Accepts either raw JSON data or a string and returns a unique list of social URLs.
 // Accepts the original query for context (if needed for future logic)
-export function parseGoogleHtml(data: any, query: string): CrawlSearchResult[] {
+export function parseGoogleHtml(data: any, query: string): string[] {
   // Accepts only raw HTML string
   if (typeof data !== 'string') {
     logger.error('Google parser expects a raw HTML string as input.');
@@ -78,28 +78,7 @@ export function parseGoogleHtml(data: any, query: string): CrawlSearchResult[] {
     logger.error('Error in background checkPerspectivesExist:', err as Error);
   });
 
-  return resultUrls.map(url => {
-    // Extract platform from URL
-    let platform = 'unknown';
-    if (url.includes('instagram.com')) {
-      platform = 'instagram';
-    } else if (url.includes('tiktok.com')) {
-      platform = 'tiktok';
-    } else if (url.includes('youtube.com')) {
-      platform = 'youtube';
-    }
-
-    return {
-      link: url,
-      username: '',
-      title: '',
-      caption: '',
-      viewCount: undefined,
-      likeCount: undefined,
-      thumbnail: '',
-      source: platform
-    };
-  });
+  return resultUrls;
 }
 
 /**

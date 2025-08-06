@@ -2,146 +2,6 @@ import type { CrawlSearchResult, YouTubeVideoData, YouTubePlayerResponse, YouTub
 import * as cheerio from 'cheerio';
 import { logger } from '../../shared/logger';
 
-function extractYouTubeVideoId(video_url: string | undefined, originalUrl?: string): string | undefined {
-  let id: string | undefined = undefined;
-  let urlToAnalyze = video_url;
-  
-  // If no canonical URL found, try the original URL
-  if (!urlToAnalyze && originalUrl) {
-    urlToAnalyze = originalUrl;
-  }
-  
-  if (!urlToAnalyze) {
-    return undefined;
-  }
-  
-  try {
-    // Clean up the URL first
-    let cleanUrl = urlToAnalyze
-      .replace(/&amp;/g, '&')  // Decode HTML entities
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .trim();
-    
-    // Remove any trailing fragments or unwanted characters
-    cleanUrl = cleanUrl.split('#')[0];
-    
-    // YouTube video ID is always 11 characters: letters, numbers, hyphens, underscores
-    const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{11}$/;
-    
-    // Array of regex patterns to try, ordered from most specific to most general
-    const patterns = [
-      // Standard watch URLs with v parameter
-      /[?&]v=([a-zA-Z0-9_-]{11})(?:[&]|$)/,
-      // Embed URLs
-      /(?:youtube\.com\/embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:[?&]|$)/,
-      // Shorts URLs
-      /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})(?:[?&]|$)/,
-      // youtu.be short URLs
-      /youtu\.be\/([a-zA-Z0-9_-]{11})(?:[?&]|$)/,
-      // Mobile URLs
-      /m\.youtube\.com\/watch[?]v=([a-zA-Z0-9_-]{11})(?:[&]|$)/,
-      // Thumbnail URLs (sometimes found in metadata)
-      /\/vi\/([a-zA-Z0-9_-]{11})\/[^\/]*$/,
-      // General fallback for any 11-character ID after common patterns
-      /(?:watch[?]v=|embed\/|shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/
-    ];
-    
-    // Try each pattern
-    for (const pattern of patterns) {
-      const match = cleanUrl.match(pattern);
-      if (match && match[1] && VIDEO_ID_REGEX.test(match[1])) {
-        id = match[1];
-        logger.debug('YouTube parser: Extracted video ID using pattern', { 
-          pattern: pattern.toString(), 
-          id, 
-          url: cleanUrl 
-        });
-        break;
-      }
-    }
-    
-    // If still no match, try parsing as URL object for query parameters
-    if (!id) {
-      try {
-        const urlObj = new URL(cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`);
-        const vParam = urlObj.searchParams.get('v');
-        if (vParam && VIDEO_ID_REGEX.test(vParam)) {
-          id = vParam;
-          logger.debug('YouTube parser: Extracted video ID from URL object', { id, url: cleanUrl });
-        }
-      } catch (urlError) {
-        // URL parsing failed, continue with other methods
-        logger.debug('YouTube parser: URL parsing failed', { error: urlError, url: cleanUrl });
-      }
-    }
-    
-    // Last resort: look for any 11-character alphanumeric sequence that might be a video ID
-    if (!id) {
-      const segments = cleanUrl.split(/[/?&=]/);
-      for (const segment of segments) {
-        if (VIDEO_ID_REGEX.test(segment)) {
-          // Validate it's likely a YouTube ID by checking context
-          const segmentIndex = segments.indexOf(segment);
-          const prevSegment = segmentIndex > 0 ? segments[segmentIndex - 1] : '';
-          
-          // Only accept if it comes after common YouTube URL parts
-          if (prevSegment.includes('v') || 
-              prevSegment.includes('embed') || 
-              prevSegment.includes('shorts') ||
-              cleanUrl.includes('youtu.be') ||
-              cleanUrl.includes('youtube.com')) {
-            id = segment;
-            logger.debug('YouTube parser: Extracted video ID from segments', { id, url: cleanUrl });
-            break;
-          }
-        }
-      }
-    }
-    
-    // Final validation
-    if (id && !VIDEO_ID_REGEX.test(id)) {
-      logger.warn('YouTube parser: Extracted ID failed validation', { id, url: cleanUrl });
-      id = undefined;
-    }
-    
-    if (!id) {
-      logger.warn('YouTube parser: Could not extract valid video ID from URL', { 
-        video_url: urlToAnalyze,
-        cleanUrl,
-        originalUrl 
-      });
-    } else {
-      logger.info('YouTube parser: Successfully extracted video ID', { id, url: cleanUrl });
-    }
-    
-  } catch (error) {
-    logger.error(`YouTube parser: Error during video ID extraction: ${error instanceof Error ? error.message : String(error)} | video_url: ${urlToAnalyze} | originalUrl: ${originalUrl}`);
-  }
-  
-  return id;
-}
-
-// Alternative helper function for testing different URL formats
-function testYouTubeUrlParsing() {
-  const testUrls = [
-    'https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=youtu.be',
-    'https://youtu.be/dQw4w9WgXcQ?t=42',
-    'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    'https://www.youtube.com/shorts/dQw4w9WgXcQ',
-    'https://m.youtube.com/watch?v=dQw4w9WgXcQ',
-    'youtube.com/watch?v=dQw4w9WgXcQ&amp;list=PLxyz',
-    'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLxyz&index=1',
-    'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg'
-  ];
-  
-  testUrls.forEach(url => {
-    const id = extractYouTubeVideoId(url);
-    console.log(`URL: ${url} -> ID: ${id}`);
-  });
-}
-
 
 // --- MAIN PARSER FUNCTION ---
 export function parseYouTubeHtml(htmlContent: string, originalUrl?: string): CrawlSearchResult[] {
@@ -255,15 +115,31 @@ function extractAuthor($: any): string {
 
 function extractVideoUrl($: any, originalUrl?: string): string {
   const canonicalUrl = $('link[rel="canonical"]').attr('href');
-  if (canonicalUrl && canonicalUrl.trim()) {
-    // Decode HTML entities in the URL
+  // Check if canonicalUrl is actually a valid string (not undefined, null, or empty)
+  if (canonicalUrl && canonicalUrl !== 'undefined' && canonicalUrl.trim()) {
     return canonicalUrl.replace(/&amp;/g, '&');
   }
-  // Fallback to originalUrl if canonical is missing
-  if (originalUrl) {
+  // Fallback to originalUrl if canonical is missing or invalid
+  if (originalUrl && originalUrl.trim()) {
     return originalUrl.replace(/&amp;/g, '&');
   }
+  
   return '';
+}
+
+function extractYouTubeVideoId(video_url: string | undefined): string | undefined {
+  // Handle case where video_url might be the string "undefined" or empty
+  if (!video_url || video_url === 'undefined' || !video_url.includes('youtube')) {
+    return undefined;
+  }
+
+  // Clean the URL
+  const cleanUrl = video_url.replace(/&amp;/g, '&').trim();
+  
+  // Simple regex to extract 11-character YouTube video ID
+  const match = cleanUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  
+  return match ? match[1] : undefined;
 }
 
 function extractThumbnailUrl($: any): string {

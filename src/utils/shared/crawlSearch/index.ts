@@ -53,14 +53,13 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
   // Otherwise, treat as search stage
 
   const platforms = ['tiktok', 'youtube', 'instagram'];
-  const results: Record<string, string[]> = {};
+  const allLinks: string[] = [];
 
   function randomDelay(min = 500, max = 1500) {
     return new Promise(res => setTimeout(res, Math.floor(Math.random() * (max - min + 1)) + min));
   }
 
   for (const platform of platforms) {
-
     const googleUrl = buildGoogleSearchUrl(input, platform);
     logger.debug(`[crawlSearch] Building Google search URL for platform: ${platform}`);
     logger.info(`[crawlSearch] Google URL: ${googleUrl}`);
@@ -76,27 +75,27 @@ export async function crawlSearch(input: string, platform?: string): Promise<any
       if (googleData && googleData.body) {
         htmlToParse = googleData.body;
         logger.debug(`[crawlSearch] Using 'body' field from response for platform: ${platform}`);
-
       } else {
         logger.warn(`[crawlSearch] No body or html found in ScrapeNinja response for platform: ${platform}, url: ${googleUrl}`);
-        results[platform] = [];
         continue;
       }
 
       logger.debug(`[crawlSearch] (Google) Raw HTML length: ${htmlToParse.length}`);
-      const links = parseGoogleHtml(htmlToParse, input).map(r => r.link);
+      const links = parseGoogleHtml(htmlToParse, input);
 
       logger.debug(`[crawlSearch] Parsed ${links.length} links for platform: ${platform}`);
-
-      results[platform] = links;
-
+      allLinks.push(...links);
     } catch (err) {
       logger.error(`[crawlSearch] Google fetch/parse error for ${platform}:`, err instanceof Error ? err : new Error(String(err)));
-      results[platform] = [];
     }
   }
 
-  return JSON.stringify(results);
+    // Shuffle resultUrls (Fisher-Yates)
+  for (let i = allLinks.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allLinks[i], allLinks[j]] = [allLinks[j], allLinks[i]];
+  }
+  return JSON.stringify(allLinks);
 }
 
 

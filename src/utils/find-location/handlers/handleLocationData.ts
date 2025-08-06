@@ -12,7 +12,7 @@ export async function upsertLocationData({ location, countryCode, queries}: {
     throw new Error('Database not connected. Call connect() first.');
   }
   const collection = db.getCollection('locations');
-  logger.debug('[upsertLocationData] Got collection', { collectionName: 'locations' });
+  logger.info('[upsertLocationData] Got collection', { collectionName: 'locations' });
   // Log all locations for debugging
   const allLocations = await collection.find({}).toArray();
   const filter = { location: location.trim(), countryCode: countryCode.trim() };
@@ -29,11 +29,11 @@ export async function upsertLocationData({ location, countryCode, queries}: {
   try {
     const result = await collection.updateOne(filter, update, options);
     if (result.upsertedCount > 0) {
-      logger.debug(`[upsertLocationData] Inserted new location: ${location}, ${countryCode}`);
+      logger.info(`[upsertLocationData] Inserted new location: ${location}, ${countryCode}`);
     } else if (result.modifiedCount > 0) {
-      logger.debug(`[INFO][upsertLocationData] Updated location: ${location}, ${countryCode}`);
+      logger.info(`[INFO][upsertLocationData] Updated location: ${location}, ${countryCode}`);
     } else {
-      logger.debug(`[upsertLocationData] No changes made for location: ${location}, ${countryCode}`);
+      logger.info(`[upsertLocationData] No changes made for location: ${location}, ${countryCode}`);
     }
   } catch (err) {
     logger.error(`[upsertLocationData] Error upserting location: ${location}, ${countryCode}`);

@@ -67,12 +67,16 @@ export async function handleLocationResponse(aiResponse: any, workflowContext: W
       return;
     }
 
+
     const { locationName, countryCode, queries } = locationData;
     logger.info('[location-response] Extracted location details', { 
       locationName, 
       countryCode, 
       queryCount: queries.length 
     });
+
+    // Upsert location data before processing search queries
+    await upsertLocationData({ location: locationName, countryCode, queries });
 
     await processSearchQueries(queries, locationName, countryCode, workflowContext);
     logger.info('[location-response] Location response processing completed');
