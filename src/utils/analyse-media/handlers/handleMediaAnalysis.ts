@@ -27,7 +27,7 @@ export async function handleAnalyseMedia(message: PostOfficeMessage) {
   // Build analysis prompt
   const prompt = buildAnalysisPrompt(blobJson, workflow);
 
-  logger.info('BuildAnalysisPrompt called. reparing to send image/text analysis job to ai-service via postman');
+  logger.info('BuildAnalysisPrompt called. Preparing to send image/text analysis job to ai-service via postman');
   const postmanPayload = {
     util: 'ai-service',
     type: 'text-image',

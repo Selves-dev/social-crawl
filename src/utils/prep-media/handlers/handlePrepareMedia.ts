@@ -48,10 +48,17 @@ if (!id) {
   return;
 }
   const baseFolder = `${platform}/json/${id}`;
+  logger.info('[handlePrepareMedia] Constructed paths', { 
+    platform, 
+    id, 
+    baseFolder,
+    blobJsonLink: blobJson.link 
+  });
   let tmpVideoPath = path.join(os.tmpdir(), `${id}-video.mp4`);
   try {
     const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, "");
     const assetBaseName = `${baseFolder}/${platform}-${id}-${timestamp}`;
+    logger.info('[handlePrepareMedia] Asset base name for downloads', { assetBaseName });
     const downloadResults = await handleDownload(assetBaseName, blobJson.link, mediaContainerName);
     media.push({ type: 'video', url: downloadResults.video });
     media.push({ type: 'audio', url: downloadResults.audio });
@@ -84,7 +91,7 @@ if (!id) {
       logger.info('Getting thumbnail from URL', { thumbUrl });
       const thumbTimestamp = new Date().toISOString().replace(/[-:.TZ]/g, "");
       const thumbAssetName = `${baseFolder}/${platform}-${id}-${thumbTimestamp}-thumbnail.jpg`;
-      const thumbnailUrl = await handleDownloadThumbnail(thumbAssetName, thumbUrl, mediaContainerName);
+      const thumbnailUrl = await handleDownloadThumbnail(thumbAssetName, thumbUrl, mediaContainerName, platform);
       media.push({ type: 'thumbnail', url: thumbnailUrl });
       logger.debug('Streamed thumbnail to blob', { thumbnail: thumbnailUrl });
     } else {
@@ -106,6 +113,37 @@ if (!id) {
     });
     logger.debug('updateBlobJson result', { result });
     logger.debug('Updated blob JSON with media URLs and workflow', { blobUrl });
+    
+    // 6. Update group blob JSONs with the complete media array (including thumbnail)
+    if (groupBlobUrls && groupBlobUrls.length > 0 && media.length > 0) {
+      logger.debug('Updating group blob JSONs with complete media array', { 
+        groupCount: groupBlobUrls.length,
+        mediaCount: media.length 
+      });
+      
+      for (let i = 0; i < groupBlobUrls.length; i++) {
+        const groupBlobUrl = groupBlobUrls[i];
+        try {
+          await updateBlobJson(groupBlobUrl, (json) => {
+            // Keep existing storyboards but add all other media (like thumbnail)
+            const existingStoryboards = json.media?.filter((m: any) => m.type === 'storyboards') || [];
+            const nonStoryboardMedia = media.filter((m: any) => m.type !== 'storyboards');
+            json.media = [...nonStoryboardMedia, ...existingStoryboards];
+            return json;
+          });
+          logger.debug('Updated group blob JSON with complete media array', { 
+            groupIndex: i,
+            groupBlobUrl 
+          });
+        } catch (err) {
+          logger.error('Failed to update group blob JSON with media', { 
+            groupIndex: i,
+            groupBlobUrl,
+            error: err instanceof Error ? err.message : String(err)
+          });
+        }
+      }
+    }
     
     // Route to analyse-media - send jobs for each group blob JSON
     if (workflow && groupBlobUrls && groupBlobUrls.length > 0) {

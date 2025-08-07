@@ -5,22 +5,34 @@ import { sendToPostOffice } from '../../utils/shared/postOffice/postman';
 export default defineEventHandler(async (event) => {
   await requireAuth(event);
   const body = await readBody(event);
-  console.info('[prep-media test] Starting workflow test', { body });
-  // Accept 'blobPath' in the request body, e.g. 'youtube/json/d_1qcZb-S80/1753983592882.json'
-  const blobPath = body?.blobPath || 'youtube/json/d_1qcZb-S80/1753983592882.json';
-  const baseUrl = 'https://socialcrawlstorage.blob.core.windows.net/media/';
-  const mediaUrl = `${baseUrl}${blobPath}`;
-  const workflow = body?.workflow || { batchId: 'test-batch', stage: 'prep-media', timestamp: new Date().toISOString() };
-  // Always include mediaUrl in the payload so it can override the blob's media link if needed
+  console.info('[get-media test] Starting workflow test', { body });
+  
+  // Accept 'link' in the request body - this should be the URL to scrape
+  const link = body?.link || 'https://www.youtube.com/watch?v=Hmye8k6qJxg';
+  const workflow = body?.workflow || { 
+    batchId: 'test-batch', 
+    stage: 'get-media', 
+    timestamp: new Date().toISOString(), 
+    l: 'ibiza',
+    w: ['things to do in ibiza'],
+    cc: 'Spain'
+  };
+  
   await sendToPostOffice({
-    util: 'crawl-media',
-    type: 'prep-media-queued',
+    util: 'get-media',
+    type: 'get-media',
     apiSecret: process.env['taash-secret'],
     workflow,
     payload: {
-      blobUrl: mediaUrl,
-      mediaUrl: body?.mediaUrl || mediaUrl
+      link,
+      requestedBy: 'test-user'
     }
   });
-  return { status: 'ok', message: 'prep-media workflow message sent', mediaUrl: body?.mediaUrl || mediaUrl };
+  
+  return { 
+    status: 'ok', 
+    message: 'get-media workflow message sent', 
+    link,
+    workflow 
+  };
 });

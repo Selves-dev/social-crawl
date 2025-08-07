@@ -90,7 +90,11 @@ export async function handleStoryboard(
     // Upload to blob
     const storyboardBlobName = `${assetBaseName}-storyboard-${gridIdx}.jpg`;
     const storyboardBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(storyboardBlobName);
-    await storyboardBlob.uploadFile(storyboardPath);
+    await storyboardBlob.uploadFile(storyboardPath, {
+      blobHTTPHeaders: {
+        blobContentType: 'image/jpeg'
+      }
+    });
     logger.debug('Uploaded storyboard to blob', { blobName: storyboardBlobName });
     const storyboardSasUrl = await generateBlobSasUrl(storyboardBlob);
     storyboardUrls.push(storyboardSasUrl);
@@ -114,10 +118,18 @@ export async function handleStoryboard(
       let mediaArr = [
         ...(originalBlobJson.media || []).filter((m: any) => m.type !== 'storyboards')
       ];
-      // Add thumbnail as a media item if present and not already in media
-      if (originalBlobJson.thumbnail && !mediaArr.some((m: any) => m.type === 'thumbnail')) {
-        mediaArr.push({ type: 'thumbnail', url: originalBlobJson.thumbnail });
-      }
+      
+      // Debug: Log what we're copying from original media
+      logger.debug('[handleStoryboard] Media array processing', {
+        groupIndex: i,
+        originalMediaCount: originalBlobJson.media?.length || 0,
+        originalMedia: originalBlobJson.media || [],
+        filteredMediaCount: mediaArr.length,
+        filteredMedia: mediaArr
+      });
+      
+      // Don't add the original thumbnail URL - we should only use processed thumbnails from blob storage
+      // The processed thumbnail should already be in the media array from prep-media
       // Add this group's storyboards
       mediaArr.push({ type: 'storyboards', url: group.join(',') });
       // Create new blob JSON with this group's storyboards and thumbnail

@@ -6,6 +6,13 @@ import { saveVenue } from '../../shared/dbStore';
  * Handler for processing AI venue search responses.
  * @param message - The workflow message or job object
  */
+// Helper: Extract first JSON object from a string
+function extractFirstJsonObject(text: string): string | null {
+  // This regex finds the first {...} or [...] block in the string
+  const match = text.match(/[\[{][\s\S]*[\]}]/);
+  return match ? match[0] : null;
+}
+
 export async function handleVenueResponse(message: any): Promise<any> {
   // Expect the AI response text as a plain string at message.payload.result
   let raw = message?.payload?.result || null;
@@ -29,13 +36,15 @@ export async function handleVenueResponse(message: any): Promise<any> {
       if (clean.startsWith('```')) {
         clean = clean.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '').trim();
       }
-      
+
       logger.debug('[handleVenueResponse] Cleaned JSON string:', { clean });
-      
-      // Parse JSON
-      const parsed = JSON.parse(clean);
+
+      // Extract only the first JSON object/array from the string
+      const jsonString = extractFirstJsonObject(clean);
+      if (!jsonString) throw new Error('No JSON object found in AI response text');
+      const parsed = JSON.parse(jsonString);
       logger.debug('[handleVenueResponse] Parsed JSON:', { parsed });
-      
+
       // Accept both new and old structures
       if (parsed.name && parsed.location && typeof parsed.location.address === 'string' && typeof parsed.location.postcode === 'string') {
         venue = {
@@ -85,6 +94,16 @@ export async function handleVenueResponse(message: any): Promise<any> {
     }
     
     logger.info('[handleVenueResponse] Successfully parsed venue:', { venue });
+    
+    // Check if this is the fallback "No venue found" response and skip saving
+    if (venue.name && (venue.name.toLowerCase() === 'no venue found' || venue.name.toLowerCase().includes('no venue'))) {
+      logger.info('[handleVenueResponse] Skipping save - no venue found in response', { venueName: venue.name });
+      return {
+        status: 'venue-response-processed-no-venue',
+        message: 'No venue information found, skipped database save',
+        venue: null
+      };
+    }
     
   } catch (err) {
     logger.error('[handleVenueResponse] Failed to parse AI response as Venue', err instanceof Error ? err : undefined, { rawError: err, raw });

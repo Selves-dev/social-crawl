@@ -115,7 +115,24 @@ async function fetchOpenAIResponse(messages: any[], options: { maxTokens?: numbe
       success: !!text
     };
 
-  } catch (error) {
+  } catch (error: any) {
+    // Axios 400 error handling
+    if (axios.isAxiosError(error) && error.response && error.response.status === 400) {
+      // Log error and what we sent
+      logger.error('[fetchOpenAIResponse] 400 Bad Request from AI API', error);
+      logger.info('[fetchOpenAIResponse] 400 Bad Request - sent data', error.config?.data);
+      logger.error('[fetchOpenAIResponse] 400 Bad Request - OpenAI response', error.response.data);
+      return {
+        error: true,
+        message: `AI API 400 Bad Request: ${error.message}. OpenAI Error: ${JSON.stringify(error.response.data)}`,
+        model: undefined,
+        success: false,
+        raw: {
+          response: error.response.data,
+          sent: error.config?.data
+        }
+      };
+    }
     logger.error('[fetchOpenAIResponse] API request failed:', error instanceof Error ? error : undefined);
     throw error;
   }
@@ -149,6 +166,24 @@ async function buildMessageContent(prompt: string, mediaUrl?: string): Promise<a
       for (const url of urls) {
         if (isImageUrl(url) || isImageType(item.type)) {
           logger.debug('[buildMessageContent] Adding image to content', { url, type: item.type });
+          
+          // Test if the URL is accessible
+          try {
+            const testResponse = await fetch(url, { method: 'HEAD' });
+            if (!testResponse.ok) {
+              logger.warn('[buildMessageContent] Image URL not accessible', { 
+                url, 
+                status: testResponse.status,
+                statusText: testResponse.statusText 
+              });
+              continue; // Skip this image if not accessible
+            }
+            logger.debug('[buildMessageContent] Image URL verified accessible', { url, contentType: testResponse.headers.get('content-type') });
+          } catch (error) {
+            logger.error('[buildMessageContent] Failed to verify image URL accessibility', error instanceof Error ? error : new Error(String(error)), { url });
+            continue; // Skip this image if verification fails
+          }
+          
           content.push({ 
             type: 'image_url', 
             image_url: { url } 

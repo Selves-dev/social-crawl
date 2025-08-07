@@ -18,6 +18,13 @@ export async function handleDownload(blobId: string, mediaUrl: string, container
   // Download video to tmp
   const tmpVideoPath = path.join(os.tmpdir(), `${blobId}-video.mp4`);
   const finalVideoBlobName = `${blobId}-video.mp4`;
+  
+  logger.info('[handleDownload] Creating blob names', { 
+    blobId, 
+    finalVideoBlobName, 
+    containerName,
+    mediaUrl 
+  });
 
   const videoBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(finalVideoBlobName);
   logger.info('Downloading video - this does take a few seconds ...', { mediaUrl, tmpVideoPath });

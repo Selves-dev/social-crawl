@@ -17,19 +17,23 @@ export function parseYouTubeHtml(htmlContent: string, originalUrl?: string): Cra
     let ytInitialPlayerResponse: YouTubePlayerResponse | null = null;
     for (const script of scripts) {
       if (script.includes('var ytInitialData =')) {
-        try {
-          const jsonStr = script.split('var ytInitialData =')[1].split('};')[0] + '}';
-          ytInitialData = JSON.parse(jsonStr);
-        } catch (err) {
-          logger.error('YouTube parser: Failed to parse ytInitialData', err as Error);
+        const match = script.match(/var ytInitialData = (\{[\s\S]*?\});/);
+        if (match) {
+          try {
+            ytInitialData = JSON.parse(match[1]);
+          } catch (err) {
+            logger.error('YouTube parser: Failed to parse ytInitialData', err as Error);
+          }
         }
       }
       if (script.includes('var ytInitialPlayerResponse =')) {
-        try {
-          const jsonStr = script.split('var ytInitialPlayerResponse =')[1].split('};')[0] + '}';
-          ytInitialPlayerResponse = JSON.parse(jsonStr);
-        } catch (err) {
-          logger.error('YouTube parser: Failed to parse ytInitialPlayerResponse', err as Error);
+        const match = script.match(/var ytInitialPlayerResponse = (\{[\s\S]*?\});/);
+        if (match) {
+          try {
+            ytInitialPlayerResponse = JSON.parse(match[1]);
+          } catch (err) {
+            logger.error('YouTube parser: Failed to parse ytInitialPlayerResponse', err as Error);
+          }
         }
       }
     }
@@ -68,9 +72,9 @@ export function parseYouTubeHtml(htmlContent: string, originalUrl?: string): Cra
       date,
       source: 'youtube', // Set platform as source
     };
-    logger.debug('YouTube parser: Parsed video result', { result });
+    logger.info('YouTube parser: Parsed video result', { result });
     // Print each field for clarity
-    logger.debug('YouTube parser: Mapped fields', {
+    logger.info('YouTube parser: Mapped fields', {
       mediaId: result.mediaId,
       link: result.link,
       username: result.username,
@@ -142,6 +146,15 @@ function extractYouTubeVideoId(video_url: string | undefined): string | undefine
   return match ? match[1] : undefined;
 }
 
+// Helper function to convert any YouTube URL to proper watch URL format
+function convertToYouTubeWatchUrl(url: string): string {
+  const videoId = extractYouTubeVideoId(url);
+  if (videoId) {
+    return `https://www.youtube.com/watch?v=${videoId}`;
+  }
+  return url; // Return original if no video ID found
+}
+
 function extractThumbnailUrl($: any): string {
   return $('meta[property="og:image"]').attr('content') || '';
 }
@@ -177,7 +190,7 @@ function extractLikeCount(ytInitialData: YouTubeInitialData | null): string {
 export default parseYouTubeHtml;
 
 // Export the improved video ID extraction function for reuse
-export { extractYouTubeVideoId, testYouTubeUrlParsing };
+export { extractYouTubeVideoId, convertToYouTubeWatchUrl };
 
 // Utility function for debugging/testing
 export function printVideoInfo(data: YouTubeVideoData | null): void {
@@ -191,6 +204,6 @@ export function printVideoInfo(data: YouTubeVideoData | null): void {
     logger.debug('Author', { author: data.author });
     logger.debug('Description', { description: data.description || 'No description found' });
     logger.debug('View Count', { viewCount: data.view_count });
-    logger.debug('Like Count', { likeCount: data.like_count });
-    logger.debug('Thumbnail URL', { thumbnail_url: data.thumbnail_url });
+    logger.info('Like Count', { likeCount: data.like_count });
+    logger.info('Thumbnail URL', { thumbnail_url: data.thumbnail_url });
 }

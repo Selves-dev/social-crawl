@@ -11,7 +11,7 @@ export async function handleSearchRequest(message: any): Promise<any> {
   const userPrompt = message?.payload?.prompt || "";
   let text = '';
   try {
-    logger.debug('[handleSearchRequest] Prompt:', { userPrompt });
+    logger.info('[handleSearchRequest] Prompt:', { userPrompt });
     const tools = [
       { googleSearch: {} }
     ];

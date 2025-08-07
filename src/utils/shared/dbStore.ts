@@ -43,42 +43,10 @@ export async function upsertPerspectiveSmartly(newPerspective: Perspective) {
       });
     }
     
-    // Merge venues (fuzzy match with confidence score)
+    // Merge venues (simple append for now - duplicates handled in saveVenue)
     if (Array.isArray(newPerspective.venues)) {
       newPerspective.venues.forEach(venue => {
-        const venueName = (venue as any).name || '';
-        const venuePostcode = (venue as any).location?.postcode || '';
-        let bestScore = 0;
-        let bestIdx = -1;
-        venues.forEach((v: any, idx: number) => {
-          const vName = v.name || '';
-          const vPostcode = v.location?.postcode || '';
-          // Fuzzy match on name
-          const nameScore = stringSimilarity.compareTwoStrings(
-            vName.toLowerCase(),
-            venueName.toLowerCase()
-          );
-          // Fuzzy match on name+postcode if both present
-          let combinedScore = nameScore;
-          if (vPostcode && venuePostcode) {
-            const combinedA = `${vName} ${vPostcode}`.toLowerCase();
-            const combinedB = `${venueName} ${venuePostcode}`.toLowerCase();
-            combinedScore = stringSimilarity.compareTwoStrings(combinedA, combinedB);
-          }
-          const score = Math.max(nameScore, combinedScore);
-          if (score > bestScore) {
-            bestScore = score;
-            bestIdx = idx;
-          }
-        });
-        // If best match is below threshold, treat as new entry
-        if (bestScore < 0.85) {
-          venues.push(venue);
-        } else {
-          // Upsert: merge or replace existing venue if needed (optional: can be more sophisticated)
-          // For now, do nothing (skip adding duplicate)
-          logger.info('Venue upsert: matched existing venue with confidence', { name: venueName, bestScore });
-        }
+        venues.push(venue);
       });
     }
     
@@ -186,19 +154,60 @@ export async function getVenue(name: string, address: string, postcode: string):
 
 export async function saveVenue(venue: Venue) {
   const collection = db.getCollection<Venue>('venues');
-  // Use name+address+postcode as unique identifier for upsert
-  const filter = {
-    name: venue.name,
-    'location.address': venue.location.address,
-    'location.postcode': venue.location.postcode
-  };
-  const result = await collection.replaceOne(filter, venue, { upsert: true });
-  logger.info('Saved venue to DB', {
+  
+  // Check for existing venues with fuzzy matching on name and postcode
+  const existingVenues = await collection.find({}).toArray();
+  const venueName = venue.name || '';
+  const venuePostcode = venue.location?.postcode || '';
+  
+  let bestScore = 0;
+  let bestMatch: any = null;
+  
+  for (const existing of existingVenues) {
+    const existingName = existing.name || '';
+    const existingPostcode = existing.location?.postcode || '';
+    
+    // Fuzzy match on name
+    const nameScore = stringSimilarity.compareTwoStrings(
+      existingName.toLowerCase(),
+      venueName.toLowerCase()
+    );
+    
+    // If both have postcodes, use combined name+postcode match
+    let combinedScore = nameScore;
+    if (existingPostcode && venuePostcode) {
+      const combinedA = `${existingName} ${existingPostcode}`.toLowerCase();
+      const combinedB = `${venueName} ${venuePostcode}`.toLowerCase();
+      combinedScore = stringSimilarity.compareTwoStrings(combinedA, combinedB);
+    }
+    
+    const score = Math.max(nameScore, combinedScore);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = existing;
+    }
+  }
+  
+  // If best match is above threshold, update existing venue
+  if (bestScore >= 0.85 && bestMatch) {
+    const filter = { _id: bestMatch._id };
+    const result = await collection.replaceOne(filter, venue);
+    logger.info('Updated existing venue with fuzzy match', {
+      name: venue.name,
+      bestScore,
+      matchedName: bestMatch.name,
+      modified: result.modifiedCount
+    });
+    return result;
+  }
+  
+  // Otherwise create new venue
+  const result = await collection.insertOne(venue);
+  logger.info('Saved new venue to DB', {
     name: venue.name,
     address: venue.location.address,
     postcode: venue.location.postcode,
-    upserted: result.upsertedId,
-    modified: result.modifiedCount
+    insertedId: result.insertedId
   });
   return result;
 }

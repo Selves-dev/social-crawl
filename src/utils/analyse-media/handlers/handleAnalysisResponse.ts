@@ -3,6 +3,13 @@ import { addQueryToPerspective, savePerspectiveFull, upsertPerspectiveSmartly } 
 import { getBlobJson } from '../../shared/azureBlob';
 import { analyseMediaLetterbox } from '../letterbox';
 
+// Helper: Extract first JSON object from a string
+function extractFirstJsonObject(text: string): string | null {
+  // This regex finds the first {...} or [...] block in the string
+  const match = text.match(/([\[{][\s\S]*[\]}])/);
+  return match ? match[0] : null;
+}
+
 export async function handleAnalysisResponse(message: any) {
   logger.debug('[handleAnalysisResponse] Full message structure (stringified)', { message: JSON.stringify(message, null, 2) });
   logger.debug('[handleAnalysisResponse] Top-level keys', { keys: Object.keys(message || {}) });
@@ -20,7 +27,10 @@ export async function handleAnalysisResponse(message: any) {
     try {
       // Replace non-breaking spaces (U+00A0) with regular spaces and then trim
       const cleanedText = response.text.replace(/\u00A0/g, ' ').trim();
-      aiResult = JSON.parse(cleanedText);
+      // Try to extract the first JSON object/array from the text
+      const jsonString = extractFirstJsonObject(cleanedText);
+      if (!jsonString) throw new Error('No JSON object found in AI response text');
+      aiResult = JSON.parse(jsonString);
       // Unwrap nested aiResult if present
       if (aiResult && aiResult.aiResult) {
         aiResult = aiResult.aiResult;
@@ -41,7 +51,9 @@ export async function handleAnalysisResponse(message: any) {
     try {
       // **CRITICAL FIX:** Clean the string before parsing for this case too
       const cleanedText = message.text.replace(/\u00A0/g, ' ').trim();
-      aiResult = JSON.parse(cleanedText);
+      const jsonString = extractFirstJsonObject(cleanedText);
+      if (!jsonString) throw new Error('No JSON object found in message.text');
+      aiResult = JSON.parse(jsonString);
       // Unwrap nested aiResult if present
       if (aiResult && aiResult.aiResult) {
         aiResult = aiResult.aiResult;
@@ -95,16 +107,35 @@ export async function handleAnalysisResponse(message: any) {
         date: blobJson.date || '',
         thumbnail: blobJson.thumbnail || ''
       };
-      // Extract video and thumbnail URLs from media array if present
-      // Just try to find the thumbnail in media, don't check for array
+      // Extract thumbnail URL ONLY from media array (processed/uploaded thumbnail)
+      // Don't use the original thumbnail URL from blobFields.thumbnail
+      
+      // Debug: Log media array content
+      logger.debug('[handleAnalysisResponse] Media array inspection', {
+        mediaId: blobJson.mediaId,
+        mediaArrayLength: blobJson.media?.length || 0,
+        mediaArray: blobJson.media || [],
+        hasThumbnailType: Array.isArray(blobJson.media) ? blobJson.media.some((m: any) => m.type === 'thumbnail') : false
+      });
+      
       try {
-        for (const m of blobJson.media) {
-          if (m.type === 'thumbnail' && m.url) {
-            thumbnailUrl = m.url;
-            break;
+        if (Array.isArray(blobJson.media)) {
+          for (const m of blobJson.media) {
+            if (m.type === 'thumbnail' && m.url) {
+              thumbnailUrl = m.url;
+              break;
+            }
           }
         }
-      } catch {}
+      } catch (err) {
+        logger.warn('[handleAnalysisResponse] Failed to extract thumbnail from media array', err as Error);
+      }
+      
+      logger.debug('[handleAnalysisResponse] Thumbnail extraction result', {
+        mediaId: blobJson.mediaId,
+        foundThumbnail: !!thumbnailUrl,
+        thumbnailUrl: thumbnailUrl
+      });
       logger.debug('[handleAnalysisResponse] Extracted blob fields', { blobFields, thumbnailUrl });
     } else {
       logger.warn('[handleAnalysisResponse] No mediaUrl found in message payload', { payload: message?.payload });
@@ -129,12 +160,10 @@ export async function handleAnalysisResponse(message: any) {
     title: blobFields.adminTitle || rest.title || '',
     date: blobFields.date || '',
     slug: rest.slug || '',
-    thumbnail: thumbnailUrl || blobFields.thumbnail || '',
+    thumbnail: thumbnailUrl || '', // Only use processed thumbnail from media array
     audioDescription: rest.audioDescription ?? [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    mediaUrl: message?.payload?.mediaUrl || '', // Save the uploaded blob URL
-    thumbnailUrl,
   };
   logger.info('[handleAnalysisResponse] Final perspective object', { perspective });
 
@@ -149,11 +178,12 @@ export async function handleAnalysisResponse(message: any) {
   if (Array.isArray(perspective.venues)) {
     for (const venue of perspective.venues) {
       // Merge l, cc, w from perspective.context into the workflow for downstream context
+      // Preserve original workflow values if perspective context is empty
       const workflow = {
         ...message.workflow,
-        l: perspective.context.l,
-        cc: perspective.context.cc,
-        w: perspective.context.w,
+        l: perspective.context.l || message.workflow?.l,
+        cc: perspective.context.cc || message.workflow?.cc,
+        w: perspective.context.w?.length > 0 ? perspective.context.w : (message.workflow?.w || []),
       };
       const venueBasicsMessage = {
         util: 'analyse-media',

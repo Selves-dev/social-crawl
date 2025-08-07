@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { Readable } from 'stream';
 
 // Compress/resize a storyboard image using sharp
 export async function compressStoryboardImage(inputPath: string, outputPath: string, options: { width?: number, height?: number, quality?: number } = {}): Promise<void> {
@@ -74,7 +75,8 @@ export async function extractAudio(inputPath: string, outputPath: string): Promi
 
 // Download and upload thumbnail
 export async function downloadAndUploadThumbnail(blobServiceClient: any, blobId: string, thumbUrl: string, containerName: string, generateBlobSasUrl: any, platform: string): Promise<string> {
-  const finalThumbBlobName = `${blobId}-thumbnail.jpg`;
+  // Use the blobId as-is since it already includes the full path and extension
+  const finalThumbBlobName = blobId;
   const thumbBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(finalThumbBlobName);
   let headers: Record<string, string> = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
@@ -87,10 +89,22 @@ export async function downloadAndUploadThumbnail(blobServiceClient: any, blobId:
     headers['Referer'] = 'https://www.youtube.com/';
   }
   const response = await axios.get(thumbUrl, {
-    responseType: 'stream',
+    responseType: 'arraybuffer', // Get as buffer instead of stream
     headers
   });
-  await thumbBlob.uploadStream(response.data);
+  
+  // Convert image to JPEG using Sharp to ensure compatibility with OpenAI
+  // This handles AVIF, WebP, PNG, and other formats that might be served as thumbnails
+  const jpegBuffer = await sharp(Buffer.from(response.data))
+    .jpeg({ quality: 85 })
+    .toBuffer();
+  
+  // Upload with proper content type for images
+  await thumbBlob.uploadStream(Readable.from([jpegBuffer]), undefined, undefined, {
+    blobHTTPHeaders: {
+      blobContentType: 'image/jpeg'
+    }
+  });
   // Generate SAS token for thumbnail blob
   const thumbSasUrl = await generateBlobSasUrl(thumbBlob);
   return thumbSasUrl;
@@ -118,56 +132,62 @@ export async function getFinalUrl(mediaUrl: string, rapidApiKey: string): Promis
     no_merge: 'false',
     audio_language: 'en'
   });
-  try {
-    const initResp = await axios.get(`${apiUrl}?${params.toString()}`, {
-      headers: {
-        'x-rapidapi-host': 'youtube-info-download-api.p.rapidapi.com',
-        'x-rapidapi-key': rapidApiKey
-      },
-      timeout: 30000
-    });
-    if (!initResp.data?.progress_url) {
-      throw new Error('No progress_url in RapidAPI response');
-    }
-    const progressUrl = initResp.data.progress_url;
-    logger.info('Polling RapidAPI progress URL', { progressUrl });
-    let downloadUrl: string | undefined;
-    const maxTries = 180;
-    for (let i = 0; i < maxTries; i++) {
-      logger.debug(`Polling attempt ${i + 1} for RapidAPI progress`, { progressUrl });
-      await new Promise(res => setTimeout(res, 1000));
-      const pollResp = await axios.get(progressUrl, {
+  let lastError;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const initResp = await axios.get(`${apiUrl}?${params.toString()}`, {
         headers: {
           'x-rapidapi-host': 'youtube-info-download-api.p.rapidapi.com',
           'x-rapidapi-key': rapidApiKey
         },
-        timeout: 15000
+        timeout: 60000
       });
-      if (pollResp.data?.download_url) {
-        downloadUrl = pollResp.data.download_url;
-        break;
+      if (!initResp.data?.progress_url) {
+        throw new Error('No progress_url in RapidAPI response');
       }
-      if (pollResp.data?.status === 'done' && pollResp.data?.url) {
-        downloadUrl = pollResp.data.url;
-        break;
+      const progressUrl = initResp.data.progress_url;
+      logger.info('Polling RapidAPI progress URL', { progressUrl });
+      let downloadUrl: string | undefined;
+      const maxTries = 180;
+      for (let i = 0; i < maxTries; i++) {
+        logger.debug(`Polling attempt ${i + 1} for RapidAPI progress`, { progressUrl });
+        await new Promise(res => setTimeout(res, 1000));
+        const pollResp = await axios.get(progressUrl, {
+          headers: {
+            'x-rapidapi-host': 'youtube-info-download-api.p.rapidapi.com',
+            'x-rapidapi-key': rapidApiKey
+          },
+          timeout: 30000
+        });
+        if (pollResp.data?.download_url) {
+          downloadUrl = pollResp.data.download_url;
+          break;
+        }
+        if (pollResp.data?.status === 'done' && pollResp.data?.url) {
+          downloadUrl = pollResp.data.url;
+          break;
+        }
+        if (pollResp.data?.status === 'error') {
+          throw new Error('RapidAPI download error: ' + (pollResp.data?.message || 'unknown error'));
+        }
       }
-      if (pollResp.data?.status === 'error') {
-        throw new Error('RapidAPI download error: ' + (pollResp.data?.message || 'unknown error'));
+      if (!downloadUrl) {
+        throw new Error('Timed out waiting for RapidAPI download to complete');
       }
+      logger.info('Successfully obtained final download URL from RapidAPI', { downloadUrl });
+      return downloadUrl;
+    } catch (err: any) {
+      lastError = err;
+      if (err.response) {
+        logger.error(`RapidAPI YouTube URL retrieval failed for url: ${mediaUrl} (attempt ${attempt}) - status: ${err.response.status} - data: ${JSON.stringify(err.response.data)}`);
+      } else {
+        logger.error(`RapidAPI YouTube URL retrieval failed for url: ${mediaUrl} (attempt ${attempt}) - ${err instanceof Error ? err.message : String(err)}`);
+      }
+      if (attempt === 2) throw err;
+      // else, retry once
     }
-    if (!downloadUrl) {
-      throw new Error('Timed out waiting for RapidAPI download to complete');
-    }
-    logger.info('Successfully obtained final download URL from RapidAPI', { downloadUrl });
-    return downloadUrl;
-  } catch (err: any) {
-    if (err.response) {
-      logger.error(`RapidAPI YouTube URL retrieval failed for url: ${mediaUrl} - status: ${err.response.status} - data: ${JSON.stringify(err.response.data)}`);
-    } else {
-      logger.error(`RapidAPI YouTube URL retrieval failed for url: ${mediaUrl} - ${err instanceof Error ? err.message : String(err)}`);
-    }
-    throw err;
   }
+  throw lastError;
 }
 
 // Download video from URL using yt-dlp

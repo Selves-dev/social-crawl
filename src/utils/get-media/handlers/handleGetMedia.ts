@@ -26,7 +26,8 @@ export async function handleGetMedia(message: PostOfficeMessage): Promise<void> 
       query: workflow?.query
     });
 
-    const mappedObject = await crawlSearch(job.link, platform) as BlobManifest;
+  
+    const mappedObject = await crawlSearch(job.link, platform, workflow, logger) as BlobManifest;
     if (!mappedObject) {
       logger.error(`[get-media] No result from crawlSearch: job=${JSON.stringify(job)}, platform=${platform}`);
       return;
@@ -56,10 +57,10 @@ export async function handleGetMedia(message: PostOfficeMessage): Promise<void> 
       }
       
       const blobName = getBlobName({ platform, id });
-      logger.debug('[get-media] Uploading mappedObject to blob', { containerName, blobName });
+      logger.info('[get-media] Uploading mappedObject to blob', { containerName, blobName });
       const blobUrl = await uploadJsonToBlob(containerName, blobName, mappedObject);
       
-      logger.debug('[get-media] Routing blobUrl to post-office for prep-media', { blobUrl, workflow });
+      logger.info('[get-media] Routing blobUrl to post-office for prep-media', { blobUrl, workflow });
       await sendToPostOffice({
         util: 'prep-media',
         type: 'prep-media',

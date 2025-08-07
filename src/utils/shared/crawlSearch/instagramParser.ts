@@ -70,7 +70,7 @@ function mapInstagramHtmlToCrawlSearchResult(html: string): CrawlSearchResult | 
         source: 'instagram', // Set platform as source
     };
 
-    logger.debug('Final Mapped Result', { result });
+    logger.info('Final Mapped Result', { result });
     return result;
 
   } catch (error) {

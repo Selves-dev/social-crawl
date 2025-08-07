@@ -101,14 +101,55 @@ export async function checkPerspectivesExist(urls: string[], query: string): Pro
 }
 
 // Helper to construct a Google search URL with realistic parameters
-export function buildGoogleSearchUrl(query: string, platform: string): string {
+export function buildGoogleSearchUrl(query: string, platform: string, cc?: string): string {
   // Only use essential parameters, randomize num for result count
   const num = Math.floor(Math.random() * 16) + 35; // 35-50 results
+  let q = `${query} ${platform}`;
+  if (cc) q = `${q} ${cc}`;
   const params = new URLSearchParams({
-    q: `${query} ${platform}`,
+    q,
     num: num.toString(),
     udm: '7', // ensure video results
   });
   return `https://www.google.com/search?${params.toString()}`;
+}
+
+// googleSearch.js - Extracted Google search functionality
+
+function randomDelay(min = 500, max = 1500) {
+  return new Promise(res => setTimeout(res, Math.floor(Math.random() * (max - min + 1)) + min));
+}
+
+function shuffleArray(array: any[]) {
+  // Fisher-Yates shuffle
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+export function getGoogleSearchTasks(input: any, platforms = ['tiktok', 'youtube', 'instagram'], logger: any) {
+  // Extract country code from input if present
+  let cc = undefined;
+  if (typeof input === 'object' && input !== null && 'cc' in input) {
+    cc = input.cc;
+  }
+  return platforms.map(platform => {
+    const googleUrl = buildGoogleSearchUrl(input, platform, cc);
+    logger.debug(`[searchGoogle] Building Google search URL for platform: ${platform}`);
+    logger.info(`[searchGoogle] Google URL: ${googleUrl}`);
+    return {
+      url: googleUrl,
+      platform,
+      parse: (html: string) => {
+        logger.debug(`[searchGoogle] Parsing Google HTML for platform: ${platform}`);
+        logger.debug(`[searchGoogle] Raw HTML length: ${html.length}`);
+        const links = parseGoogleHtml(html, input);
+        logger.debug(`[searchGoogle] Parsed ${links.length} links for platform: ${platform}`);
+        return links;
+      }
+    };
+  });
 }
 
