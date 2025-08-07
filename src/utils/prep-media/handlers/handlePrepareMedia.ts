@@ -86,12 +86,14 @@ if (!id) {
   // 4. Download thumbnail from the URL by streaming to blob
   try {
     const thumbUrl = blobJson.thumbnail || blobJson.thumbnailUrl || message.thumbnailUrl;
-    // ...no thumbnail logging before download...
+    // Extract cc and l from workflow, blobJson, or message
+    const cc = workflow?.cc || blobJson?.cc || message?.cc || '';
+    const l = workflow?.l || blobJson?.l || message?.l || '';
     if (thumbUrl) {
-      logger.info('Getting thumbnail from URL', { thumbUrl });
+      logger.info('Getting thumbnail from URL', { thumbUrl, cc, l });
       const thumbTimestamp = new Date().toISOString().replace(/[-:.TZ]/g, "");
       const thumbAssetName = `${baseFolder}/${platform}-${id}-${thumbTimestamp}-thumbnail.jpg`;
-      const thumbnailUrl = await handleDownloadThumbnail(thumbAssetName, thumbUrl, mediaContainerName, platform);
+      const thumbnailUrl = await handleDownloadThumbnail(thumbAssetName, thumbUrl, mediaContainerName, platform, cc, l);
       media.push({ type: 'thumbnail', url: thumbnailUrl });
       logger.debug('Streamed thumbnail to blob', { thumbnail: thumbnailUrl });
     } else {
@@ -132,15 +134,10 @@ if (!id) {
             return json;
           });
           logger.debug('Updated group blob JSON with complete media array', { 
-            groupIndex: i,
             groupBlobUrl 
           });
         } catch (err) {
-          logger.error('Failed to update group blob JSON with media', { 
-            groupIndex: i,
-            groupBlobUrl,
-            error: err instanceof Error ? err.message : String(err)
-          });
+          logger.error(`Failed to update group blob JSON with media for groupBlobUrl=${groupBlobUrl}: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     }

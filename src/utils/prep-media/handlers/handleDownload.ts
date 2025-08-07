@@ -71,11 +71,18 @@ export async function handleDownload(blobId: string, mediaUrl: string, container
   };
 }
 
-export async function handleDownloadThumbnail(blobId: string, thumbUrl: string, containerName: string, platform: string) {
+export async function handleDownloadThumbnail(
+  blobId: string,
+  thumbUrl: string,
+  containerName: string,
+  platform: string,
+  cc?: string,
+  l?: string
+) {
   const blobServiceClient = getBlobServiceClient();
   if (!blobServiceClient) {
     throw new Error('Missing Azure Storage connection string');
   }
-  return downloadAndUploadThumbnail(blobServiceClient, blobId, thumbUrl, containerName, generateBlobSasUrl, platform);
+  return downloadAndUploadThumbnail(blobServiceClient, blobId, thumbUrl, containerName, generateBlobSasUrl, platform, cc, l);
 }
 

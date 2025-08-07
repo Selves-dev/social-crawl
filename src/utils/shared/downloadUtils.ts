@@ -74,10 +74,27 @@ export async function extractAudio(inputPath: string, outputPath: string): Promi
 }
 
 // Download and upload thumbnail
-export async function downloadAndUploadThumbnail(blobServiceClient: any, blobId: string, thumbUrl: string, containerName: string, generateBlobSasUrl: any, platform: string): Promise<string> {
-  // Use the blobId as-is since it already includes the full path and extension
-  const finalThumbBlobName = blobId;
-  const thumbBlob = blobServiceClient.getContainerClient(containerName).getBlockBlobClient(finalThumbBlobName);
+export async function downloadAndUploadThumbnail(
+  blobServiceClient: any,
+  blobId: string,
+  thumbUrl: string,
+  containerName: string,
+  generateBlobSasUrl: any,
+  platform: string,
+  cc?: string,
+  l?: string
+): Promise<string> {
+  // Always use the 'public' container for thumbnails
+  // For thumbnails, group by platform/cc/l only (no json/<id>)
+  const platformPath = platform ? platform.toLowerCase() : '';
+  const ccPath = cc ? cc.toLowerCase() : '';
+  const lPath = l ? l.toLowerCase() : '';
+  const thumbFolder = [platformPath, ccPath, lPath].filter(Boolean).join('/');
+  // Use only the last segment of blobId for the filename
+  const blobIdParts = blobId.split('/');
+  const thumbFileName = blobIdParts[blobIdParts.length - 1];
+  const finalThumbBlobName = `${thumbFolder}/${thumbFileName}`;
+  const thumbBlob = blobServiceClient.getContainerClient('public').getBlockBlobClient(finalThumbBlobName);
   let headers: Record<string, string> = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
   };
@@ -105,9 +122,10 @@ export async function downloadAndUploadThumbnail(blobServiceClient: any, blobId:
       blobContentType: 'image/jpeg'
     }
   });
-  // Generate SAS token for thumbnail blob
-  const thumbSasUrl = await generateBlobSasUrl(thumbBlob);
-  return thumbSasUrl;
+  // Construct ImageKit.io URL for the thumbnail
+  // Example: https://ik.imagekit.io/yond/az/<platform>/<cc>/<l>/<filename>
+  const imageKitUrl = `https://ik.imagekit.io/yond/az/${thumbFolder}/${thumbFileName}`;
+  return imageKitUrl;
 }
 
 
