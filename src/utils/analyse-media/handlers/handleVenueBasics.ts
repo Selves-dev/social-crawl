@@ -12,7 +12,7 @@ import { buildVenueBasicsPrompt } from './buildAnalysisPrompts';
 export async function handleVenueBasics(message: any): Promise<any> {
   logger.info('[handleVenueBasics] Called with message:', { message });
 
-  const prompt = buildVenueBasicsPrompt(message);
+  const prompt = buildVenueBasicsPrompt(message, message.workflow);
   logger.debug('[handleVenueBasics] Built prompt for search service:', { prompt });
   // Send to search service (ai-service) for further enrichment
   await sendToPostOffice({

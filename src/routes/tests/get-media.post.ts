@@ -8,13 +8,13 @@ export default defineEventHandler(async (event) => {
   console.info('[get-media test] Starting workflow test', { body });
   
   // Accept 'link' in the request body - this should be the URL to scrape
-  const link = body?.link || 'https://www.tiktok.com/@elizhwalker/video/7531090473729953046';
+  const link = body?.link || 'https://www.instagram.com/reel/DKPwBiyslt3/';
   const workflow = body?.workflow || { 
     batchId: 'test-batch', 
     stage: 'get-media', 
     timestamp: new Date().toISOString(), 
-    l: 'gloucestershire',
-    w: ['things to do in cotswolds'],
+    l: 'norwich',
+    w: ['things to do in norwich'],
     cc: 'Uk'
   };
   

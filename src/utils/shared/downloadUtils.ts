@@ -165,32 +165,98 @@ export async function getFinalUrl(mediaUrl: string, rapidApiKey: string): Promis
       }
       const progressUrl = initResp.data.progress_url;
       logger.info('Polling RapidAPI progress URL', { progressUrl });
+      
       let downloadUrl: string | undefined;
-      const maxTries = 180;
+      
+      // Configurable timeout - default 5 minutes for long videos, max 10 minutes
+      const timeoutMinutes = parseInt(process.env.RAPIDAPI_TIMEOUT_MINUTES || '5');
+      const maxTimeoutMinutes = 10;
+      const actualTimeoutMinutes = Math.min(timeoutMinutes, maxTimeoutMinutes);
+      const maxTries = actualTimeoutMinutes * 60; // 1 second per try
+      const startTime = Date.now();
+      
+      logger.info('Starting RapidAPI polling with timeout', { 
+        maxTries, 
+        timeoutMinutes: actualTimeoutMinutes,
+        maxTimeoutMinutes 
+      });
+      
       for (let i = 0; i < maxTries; i++) {
-        logger.debug(`Polling attempt ${i + 1} for RapidAPI progress`, { progressUrl });
-        await new Promise(res => setTimeout(res, 1000));
-        const pollResp = await axios.get(progressUrl, {
-          headers: {
-            'x-rapidapi-host': 'youtube-info-download-api.p.rapidapi.com',
-            'x-rapidapi-key': rapidApiKey
-          },
-          timeout: 30000
+        const elapsedMinutes = (Date.now() - startTime) / (1000 * 60);
+        
+        logger.debug(`Polling attempt ${i + 1}/${maxTries} for RapidAPI progress`, { 
+          progressUrl, 
+          elapsedMinutes: elapsedMinutes.toFixed(1),
+          timeoutMinutes: actualTimeoutMinutes
         });
-        if (pollResp.data?.download_url) {
-          downloadUrl = pollResp.data.download_url;
-          break;
-        }
-        if (pollResp.data?.status === 'done' && pollResp.data?.url) {
-          downloadUrl = pollResp.data.url;
-          break;
-        }
-        if (pollResp.data?.status === 'error') {
-          throw new Error('RapidAPI download error: ' + (pollResp.data?.message || 'unknown error'));
+        
+        await new Promise(res => setTimeout(res, 1000));
+        
+        try {
+          const pollResp = await axios.get(progressUrl, {
+            headers: {
+              'x-rapidapi-host': 'youtube-info-download-api.p.rapidapi.com',
+              'x-rapidapi-key': rapidApiKey
+            },
+            timeout: 30000
+          });
+          
+          if (pollResp.data?.download_url) {
+            downloadUrl = pollResp.data.download_url;
+            logger.info('RapidAPI processing completed successfully', { 
+              elapsedMinutes: elapsedMinutes.toFixed(1),
+              attempt: i + 1 
+            });
+            break;
+          }
+          if (pollResp.data?.status === 'done' && pollResp.data?.url) {
+            downloadUrl = pollResp.data.url;
+            logger.info('RapidAPI processing completed successfully', { 
+              elapsedMinutes: elapsedMinutes.toFixed(1),
+              attempt: i + 1 
+            });
+            break;
+          }
+          if (pollResp.data?.status === 'error') {
+            throw new Error('RapidAPI download error: ' + (pollResp.data?.message || 'unknown error'));
+          }
+          
+          // Check for completed processing but no video file (e.g., Instagram image posts)
+          if (pollResp.data?.success === 1 && pollResp.data?.progress >= 1000 && !pollResp.data?.download_url) {
+            const errorText = pollResp.data?.text || 'No video file available';
+            logger.warn('RapidAPI completed processing but no video file found', { 
+              success: pollResp.data.success,
+              progress: pollResp.data.progress,
+              text: errorText,
+              mediaUrl 
+            });
+            throw new Error(`No video content found in media URL. This may be an image-only post or unsupported content type. API response: ${errorText}`);
+          }
+          
+          // Log progress every 30 seconds (30 attempts)
+          if (i > 0 && i % 30 === 0) {
+            logger.info('RapidAPI still processing video', { 
+              elapsedMinutes: elapsedMinutes.toFixed(1),
+              remainingMinutes: (actualTimeoutMinutes - elapsedMinutes).toFixed(1),
+              status: pollResp.data?.status || 'unknown'
+            });
+          }
+        } catch (pollError: any) {
+          // Log polling errors but continue trying unless it's a persistent error
+          if (pollError.code === 'ECONNRESET' || pollError.code === 'ETIMEDOUT') {
+            logger.warn('RapidAPI polling request failed, will retry', { 
+              attempt: i + 1, 
+              error: pollError.message 
+            });
+            continue;
+          }
+          throw pollError;
         }
       }
+      
       if (!downloadUrl) {
-        throw new Error('Timed out waiting for RapidAPI download to complete');
+        const finalElapsedMinutes = (Date.now() - startTime) / (1000 * 60);
+        throw new Error(`Timed out waiting for RapidAPI download to complete after ${finalElapsedMinutes.toFixed(1)} minutes (max: ${actualTimeoutMinutes} minutes). This video may be too long to process.`);
       }
       logger.info('Successfully obtained final download URL from RapidAPI', { downloadUrl });
       return downloadUrl;

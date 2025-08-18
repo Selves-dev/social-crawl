@@ -11,12 +11,12 @@ export async function handleSearchRequest(message: any): Promise<any> {
   const userPrompt = message?.payload?.prompt || "";
   let text = '';
   try {
-    logger.info('[handleSearchRequest] Prompt:', { userPrompt });
+    logger.debug('[handleSearchRequest] Prompt:', { userPrompt });
     const tools = [
       { googleSearch: {} }
     ];
     const config = {
-      temperature: 0.25,
+      temperature: 0.15,
       thinkingConfig: {
         thinkingBudget: 0,
       },
@@ -31,7 +31,7 @@ export async function handleSearchRequest(message: any): Promise<any> {
       },
     ];
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
+      model: 'gemini-2.5-flash',
       config,
       contents,
     });

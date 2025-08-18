@@ -10,7 +10,7 @@ export function parseTikTokHtml(htmlContent: string): CrawlSearchResult[] {
     const scriptMatch = htmlContent.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">(.*?)<\/script>/s);
     
     if (!scriptMatch) {
-      logger.debug('TikTok parser: Could not find data script tag');
+      logger.info('TikTok parser: Could not find data script tag');
       return [];
     }
 
@@ -21,7 +21,7 @@ export function parseTikTokHtml(htmlContent: string): CrawlSearchResult[] {
     const videoData = jsonData?.__DEFAULT_SCOPE__?.['webapp.video-detail']?.itemInfo?.itemStruct;
     
     if (!videoData) {
-      logger.debug('TikTok parser: Could not find video data in JSON');
+      logger.info('TikTok parser: Could not find video data in JSON');
       return [];
     }
 

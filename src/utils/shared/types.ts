@@ -10,16 +10,41 @@ export interface PostOfficeMessage {
 // Venue type for AI venue extraction and MongoDB
 export interface Venue {
   name: string;
+  category?: string;
   location: {
-    address: string;
+    fullAddress?: string;
+    street?: string;
+    city?: string;
+    state_province?: string | null;
     postcode: string;
-    [key: string]: any;
+    country?: string;
+    // Removed latitude and longitude - will be geocoded separately
+    // Keep legacy address field for backward compatibility
+    address?: string;
   };
-  rooms: Array<{
-    name: string;
-    [key: string]: any;
+  contact?: {
+    phone?: string;
+    email?: string;
+    website?: string;
+  };
+  // Simplified attributes - removed priceRange and openingHours
+  hotelDetails?: {
+    keyFeatures?: string[]; // Moved from attributes
+    roomTypes?: Array<{
+      name: string;
+      description?: string;
+      amenities?: string[];
+    }>;
+  };
+  // Published content moved to top level
+  publishedContent?: Array<{
+    sourceName: string;
+    articleTitle?: string;
+    author?: string | null;
+    url: string;
+    contentType?: string;
+    publicationDate?: string;
   }>;
-  [key: string]: any;
 }
 
 export type SearchCrawlJob = {
