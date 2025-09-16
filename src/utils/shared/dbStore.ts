@@ -1,213 +1,231 @@
 import { db } from './database';
 import { logger } from './logger';
 import type { Perspective, Venue } from './types';
-import stringSimilarity from 'string-similarity';
+import { ObjectId } from 'mongodb';
 
-/**
- * Upsert a full perspective document (overwrite or create)
- */
+// PERSPECTIVE OPERATIONS
 export async function savePerspectiveFull(perspective: Perspective) {
   const collection = db.getCollection<Perspective>('perspectives');
-  // Use permalink as unique identifier for upsert
-  const filter = { permalink: perspective.permalink };
-  const result = await collection.replaceOne(filter, perspective, { upsert: true });
-  logger.info('Saved full perspective to DB', {
-    permalink: perspective.permalink,
-    upserted: result.upsertedId,
-    modified: result.modifiedCount
-  });
+  const result = await collection.replaceOne(
+    { permalink: perspective.permalink }, 
+    perspective, 
+    { upsert: true }
+  );
   return result;
 }
 
-/**
- * Smart upsert for perspectives that appends to arrays and preserves existing data
- * Uses mediaId as the unique identifier since each media item should have its own perspective
- */
-export async function upsertPerspectiveSmartly(newPerspective: Perspective) {
+export async function upsertPerspective(newPerspective: Perspective) {
   const collection = db.getCollection<Perspective>('perspectives');
-  const existing = await collection.findOne({ mediaId: newPerspective.mediaId });
+  
+  // Check for duplicate by mediaId OR permalink
+  const existing = await collection.findOne({
+    $or: [
+      { mediaId: newPerspective.mediaId },
+      { permalink: newPerspective.permalink }
+    ]
+  });
   
   if (existing) {
-    // Merge arrays intelligently
-    const mediaDescriptions = Array.isArray(existing.mediaDescription) ? existing.mediaDescription : [];
-    const audioDescriptions = Array.isArray(existing.audioDescription) ? existing.audioDescription : [];
-    const venues = Array.isArray(existing.venues) ? existing.venues : [];
-    const locations = Array.isArray(existing.locations) ? existing.locations : [];
+    // Merge venues intelligently - remove venues without venueId if there's a linked version
+    const allVenues = [...(existing.venues || []), ...(newPerspective.venues || [])];
+    const cleanedVenues = mergeVenues(allVenues);
     
-    // Add new mediaDescription entries if provided and not already present
-    if (Array.isArray(newPerspective.mediaDescription)) {
-      newPerspective.mediaDescription.forEach(desc => {
-        if (desc && !mediaDescriptions.includes(desc)) {
-          mediaDescriptions.push(desc);
-        }
-      });
-    }
-    
-    // Merge venues (simple append for now - duplicates handled in saveVenue)
-    if (Array.isArray(newPerspective.venues)) {
-      newPerspective.venues.forEach(venue => {
-        venues.push(venue);
-      });
-    }
-    
-    // Merge locations (avoid duplicates by name)
-    if (Array.isArray(newPerspective.locations)) {
-      newPerspective.locations.forEach(location => {
-        if (!locations.some(l => l.name === location.name)) {
-          locations.push(location);
-        }
-      });
-    }
-    
-    // Update with merged data
-    const updatedPerspective = {
+    const merged = {
       ...existing,
       ...newPerspective,
-      mediaDescription: mediaDescriptions,
-      audioDescription: audioDescriptions,
-      venues,
-      locations,
+      mediaDescription: mergeArrays(existing.mediaDescription, newPerspective.mediaDescription),
+      venues: cleanedVenues,
+      locations: mergeLocationsByName(existing.locations, newPerspective.locations),
       updatedAt: new Date().toISOString()
     };
-    
-    const result = await collection.replaceOne({ mediaId: newPerspective.mediaId }, updatedPerspective);
-    logger.info('Smart upserted perspective to DB', {
-      mediaId: newPerspective.mediaId,
-      permalink: newPerspective.permalink,
-      mediaDescriptions: mediaDescriptions.length,
-      venues: venues.length,
-      locations: locations.length,
-      modified: result.modifiedCount
-    });
-    return result;
-  } else {
-    // Create new with arrays properly initialized
-    const newDoc = {
-      ...newPerspective,
-      mediaDescription: Array.isArray(newPerspective.mediaDescription) ? newPerspective.mediaDescription : [],
-      audioDescription: Array.isArray(newPerspective.audioDescription) ? newPerspective.audioDescription : [],
-      venues: Array.isArray(newPerspective.venues) ? newPerspective.venues : [],
-      locations: Array.isArray(newPerspective.locations) ? newPerspective.locations : [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    const result = await collection.insertOne(newDoc);
-    logger.info('Created new perspective with smart upsert', {
-      mediaId: newPerspective.mediaId,
-      permalink: newPerspective.permalink,
-      insertedId: result.insertedId
-    });
-    return result;
+    return await collection.replaceOne({ _id: existing._id }, merged);
   }
+  
+  return await collection.insertOne({
+    ...newPerspective,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
 }
 
 export async function findPerspectiveByPermalink(permalink: string): Promise<Perspective | null> {
-  const collection = db.getCollection<Perspective>('perspectives');
-  return await collection.findOne({ permalink });
+  return await db.getCollection<Perspective>('perspectives').findOne({ permalink });
 }
 
 export async function findPerspectiveByMediaId(mediaId: string): Promise<Perspective | null> {
-  const collection = db.getCollection<Perspective>('perspectives');
-  return await collection.findOne({ mediaId });
+  return await db.getCollection<Perspective>('perspectives').findOne({ mediaId });
 }
 
-export async function addQueryToPerspective(permalink: string, query: string, newPerspective?: Perspective): Promise<void> {
+export async function addQueryToPerspective(permalink: string, query: string, newPerspective?: Perspective) {
   const collection = db.getCollection<Perspective>('perspectives');
-  const perspective = await collection.findOne({ permalink });
-  if (perspective) {
-    let queries: string[] = Array.isArray(perspective.context?.w)
-      ? perspective.context.w
-      : [];
+  const existing = await collection.findOne({ permalink });
+  
+  if (existing) {
+    const queries = existing.context?.w || [];
     if (!queries.includes(query)) {
-      queries.push(query);
-      await collection.updateOne({ permalink }, { $set: { 'context.w': queries } });
-      logger.info('Added query to existing perspective', { permalink, query });
+      await collection.updateOne({ permalink }, { $set: { 'context.w': [...queries, query] } });
     }
-  } else {
-    if (!newPerspective) {
-      throw new Error('Full Perspective object required to create new perspective');
-    }
+  } else if (newPerspective) {
     await collection.insertOne(newPerspective);
-    logger.info('Created new perspective with full object', { permalink, query });
+  } else {
+    throw new Error('Perspective not found and no fallback provided');
   }
 }
 
 export async function getQueriesForPermalink(permalink: string): Promise<string[]> {
-  const collection = db.getCollection<Perspective>('perspectives');
-  const perspective = await collection.findOne({ permalink });
-  if (Array.isArray(perspective?.context?.w)) return perspective.context.w;
-  return [];
+  const perspective = await findPerspectiveByPermalink(permalink);
+  return perspective?.context?.w || [];
 }
 
-/**
- * Venue business logic
- */
-export async function getVenue(name: string, address: string, postcode: string): Promise<Venue | null> {
+// VENUE OPERATIONS
+export async function saveVenue(venue: any, mediaId?: string) {
   const collection = db.getCollection<Venue>('venues');
-  return await collection.findOne({
+  
+  // Check for duplicates by name + zipcode OR name + coordinates
+  const duplicateQuery = {
+    name: venue.name,
+    $or: [
+      { 'location.zipcode': venue.location?.zipcode },
+      ...(venue.location?.lat && venue.location?.lon ? [{
+        'location.lat': { $gte: venue.location.lat - 0.001, $lte: venue.location.lat + 0.001 },
+        'location.lon': { $gte: venue.location.lon - 0.001, $lte: venue.location.lon + 0.001 }
+      }] : [])
+    ]
+  };
+  
+  const existing = await collection.findOne(duplicateQuery);
+  
+  if (existing) {
+    // Merge mediaIds - handle legacy venues that might have single mediaId
+    const existingMediaIds = existing.mediaIds || [];
+    if (mediaId && !existingMediaIds.includes(mediaId)) {
+      existingMediaIds.push(mediaId);
+    }
+    
+    const merged = { 
+      ...existing, 
+      ...venue, 
+      _id: existing._id,
+      mediaIds: existingMediaIds,
+      updatedAt: new Date().toISOString()
+    };
+    
+    await collection.replaceOne({ _id: existing._id }, merged);
+    if (mediaId) await linkVenueToPerspective(existing._id.toString(), mediaId, venue.name);
+    return existing._id;
+  }
+  
+  // Create new venue
+  if (mediaId) {
+    venue.mediaIds = [mediaId];
+    venue.createdAt = new Date().toISOString();
+  }
+  
+  const result = await collection.insertOne(venue);
+  if (mediaId && result.insertedId) {
+    await linkVenueToPerspective(result.insertedId.toString(), mediaId, venue.name);
+  }
+  
+  return result.insertedId;
+}
+
+export async function getVenue(name: string, address: string, zipcode: string): Promise<Venue | null> {
+  return await db.getCollection<Venue>('venues').findOne({
     name,
     'location.address': address,
-    'location.postcode': postcode
+    'location.zipcode': zipcode
   });
 }
 
-export async function saveVenue(venue: Venue) {
-  const collection = db.getCollection<Venue>('venues');
-  
-  // Check for existing venues with fuzzy matching on name and postcode
-  const existingVenues = await collection.find({}).toArray();
-  const venueName = venue.name || '';
-  const venuePostcode = venue.location?.postcode || '';
-  
-  let bestScore = 0;
-  let bestMatch: any = null;
-  
-  for (const existing of existingVenues) {
-    const existingName = existing.name || '';
-    const existingPostcode = existing.location?.postcode || '';
-    
-    // Fuzzy match on name
-    const nameScore = stringSimilarity.compareTwoStrings(
-      existingName.toLowerCase(),
-      venueName.toLowerCase()
+export async function getVenuesByMediaId(mediaId: string): Promise<Venue[]> {
+  return await db.getCollection<Venue>('venues').find({ mediaIds: mediaId }).toArray();
+}
+
+export async function getPerspectivesByVenueId(venueId: string): Promise<Perspective[]> {
+  return await db.getCollection<Perspective>('perspectives').find({ 'venues.venueId': venueId }).toArray();
+}
+
+// LINKING OPERATIONS
+export async function linkVenueToPerspective(venueId: string, mediaId: string, venueName: string) {
+  try {
+    // Add venue to perspective
+    const perspectiveResult = await db.getCollection<Perspective>('perspectives').findOneAndUpdate(
+      { mediaId },
+      { 
+        $addToSet: { 
+          venues: { name: venueName, venueId, confidence: 0.99 }
+        },
+        $set: { updatedAt: new Date().toISOString() }
+      },
+      { returnDocument: 'after' }
     );
     
-    // If both have postcodes, use combined name+postcode match
-    let combinedScore = nameScore;
-    if (existingPostcode && venuePostcode) {
-      const combinedA = `${existingName} ${existingPostcode}`.toLowerCase();
-      const combinedB = `${venueName} ${venuePostcode}`.toLowerCase();
-      combinedScore = stringSimilarity.compareTwoStrings(combinedA, combinedB);
+    // Check if perspective was found
+    if (!perspectiveResult) {
+      logger.warn('[linkVenueToPerspective] No perspective found with mediaId', { 
+        mediaId, 
+        venueId, 
+        venueName 
+      });
+      return; // Exit gracefully - venue is still saved, just not linked
     }
     
-    const score = Math.max(nameScore, combinedScore);
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = existing;
-    }
-  }
-  
-  // If best match is above threshold, update existing venue
-  if (bestScore >= 0.85 && bestMatch) {
-    const filter = { _id: bestMatch._id };
-    const result = await collection.replaceOne(filter, venue);
-    logger.info('Updated existing venue with fuzzy match', {
-      name: venue.name,
-      bestScore,
-      matchedName: bestMatch.name,
-      modified: result.modifiedCount
+    logger.debug('[linkVenueToPerspective] Successfully linked venue to perspective', {
+      venueId,
+      perspectiveId: perspectiveResult._id.toString(),
+      mediaId,
+      venueName
     });
-    return result;
+  } catch (error) {
+    logger.error('Failed to link venue to perspective', error instanceof Error ? error : new Error(String(error)), { venueId, mediaId });
   }
-  
-  // Otherwise create new venue
-  const result = await collection.insertOne(venue);
-  logger.info('Saved new venue to DB', {
-    name: venue.name,
-    address: venue.location.address,
-    postcode: venue.location.postcode,
-    insertedId: result.insertedId
+}
+
+// UTILITY FUNCTIONS
+function mergeArrays(existing: any[] = [], incoming: any[] = []): any[] {
+  const merged = [...existing];
+  incoming.forEach(item => {
+    if (item && !merged.includes(item)) merged.push(item);
   });
-  return result;
+  return merged;
+}
+
+function mergeVenues(venues: Array<{ name: string; confidence: number; venueId?: string }> = []): Array<{ name: string; confidence: number; venueId?: string }> {
+  const venueMap = new Map<string, { name: string; confidence: number; venueId?: string }>();
+  
+  // Process all venues, keeping the one with highest confidence
+  // If there's a venue with venueId and one without for the same name, keep the one with venueId
+  venues.forEach(venue => {
+    const key = venue.name.toLowerCase().trim();
+    const existing = venueMap.get(key);
+    
+    if (!existing) {
+      venueMap.set(key, venue);
+    } else {
+      // Prefer venue with venueId
+      if (venue.venueId && !existing.venueId) {
+        venueMap.set(key, venue);
+      } else if (!venue.venueId && existing.venueId) {
+        // Keep existing (which has venueId)
+        return;
+      } else {
+        // Both have venueId or both don't - keep higher confidence
+        if (venue.confidence > existing.confidence) {
+          venueMap.set(key, venue);
+        }
+      }
+    }
+  });
+  
+  return Array.from(venueMap.values());
+}
+
+function mergeLocationsByName(existing: any[] = [], incoming: any[] = []): any[] {
+  const merged = [...existing];
+  incoming.forEach(location => {
+    if (!merged.some(l => l.name === location.name)) {
+      merged.push(location);
+    }
+  });
+  return merged;
 }

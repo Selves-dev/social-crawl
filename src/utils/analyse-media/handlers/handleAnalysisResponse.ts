@@ -1,5 +1,5 @@
 import { logger } from '../../shared/logger';
-import { addQueryToPerspective, savePerspectiveFull, upsertPerspectiveSmartly } from '../../shared/dbStore';
+import { addQueryToPerspective, savePerspectiveFull, upsertPerspective, findPerspectiveByMediaId } from '../../shared/dbStore';
 import { getBlobJson } from '../../shared/azureBlob';
 import { analyseMediaLetterbox } from '../letterbox';
 
@@ -169,34 +169,40 @@ export async function handleAnalysisResponse(message: any) {
 
   try {
     // Use smart upsert to append mediaDescription and merge other fields
-    await upsertPerspectiveSmartly(perspective);
+    const upsertResult = await upsertPerspective(perspective);
+    
+    logger.info('[handleAnalysisResponse] Perspective saved', { 
+      mediaId: perspective.mediaId,
+      hasInsertedId: !!(upsertResult as any).insertedId,
+      hasModifiedCount: typeof (upsertResult as any).modifiedCount === 'number'
+    });
+    
+    // For each venue, queue a venue-basics request
+    if (Array.isArray(perspective.venues)) {
+      for (const venue of perspective.venues) {
+        // Merge l, cc, w from perspective.context into the workflow for downstream context
+        // Preserve original workflow values if perspective context is empty
+        const workflow = {
+          ...message.workflow,
+          l: perspective.context.l || message.workflow?.l,
+          cc: perspective.context.cc || message.workflow?.cc,
+          w: perspective.context.w?.length > 0 ? perspective.context.w : (message.workflow?.w || []),
+        };
+        const venueBasicsMessage = {
+          util: 'analyse-media',
+          type: 'venue-basics',
+          workflow,
+          apiSecret: process.env['taash-secret'],
+          payload: {
+            venue,
+            mediaId: perspective.mediaId, // Use mediaId to link back to perspective
+          },
+        };
+        await analyseMediaLetterbox(venueBasicsMessage);
+      }
+    }
   } catch (err) {
     logger.error('Failed to save perspective to database', err as Error);
-  }
-
-  // For each venue, queue a venue-basics request
-  if (Array.isArray(perspective.venues)) {
-    for (const venue of perspective.venues) {
-      // Merge l, cc, w from perspective.context into the workflow for downstream context
-      // Preserve original workflow values if perspective context is empty
-      const workflow = {
-        ...message.workflow,
-        l: perspective.context.l || message.workflow?.l,
-        cc: perspective.context.cc || message.workflow?.cc,
-        w: perspective.context.w?.length > 0 ? perspective.context.w : (message.workflow?.w || []),
-      };
-      const venueBasicsMessage = {
-        util: 'analyse-media',
-        type: 'venue-basics',
-        workflow,
-        apiSecret: process.env['taash-secret'],
-        payload: {
-          venue,
-          mediaId: perspective.mediaId,
-        },
-      };
-      await analyseMediaLetterbox(venueBasicsMessage);
-    }
   }
   return perspective;
 }

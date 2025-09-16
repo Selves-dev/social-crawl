@@ -119,6 +119,16 @@ class DatabaseManager {
   }
 
   /**
+   * Get a specific database by name (for accessing different databases like hotelston)
+   */
+  getSpecificDatabase(databaseName: string): Db {
+    if (!this.client || !this.isConnected) {
+      throw new Error('Database not connected. Call connect() first.')
+    }
+    return this.client.db(databaseName)
+  }
+
+  /**
    * Check if database is connected
    */
   isConnectedStatus(): boolean {

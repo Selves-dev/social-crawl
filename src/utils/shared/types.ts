@@ -7,10 +7,61 @@ export interface PostOfficeMessage {
   payload: any;
 }
 
-// Venue type for AI venue extraction and MongoDB
+// Enhanced venue types for AI venue extraction
+export interface BaseVenue {
+  name: string;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+export interface Hotel extends BaseVenue {
+  hotel_id?: string;
+  hotelCode?: string; // Link to hotelston database (3.5M hotel records)
+  type: string; // hotel, boutique, resort, aparthotel
+  star_rating?: number;
+  chain_parent?: string | null;
+  year_built?: number | null;
+  last_renovated?: number | null;
+  short_description?: string | null;
+  transport_convenience?: string | null; // excellent, good, moderate
+  facilities?: Array<{
+    name: string;
+    category: string; // dining, recreation, business, wellness, transport
+    subcategory?: string | null;
+  }>;
+  room_types?: Array<{
+    name: string;
+    bed_configuration?: string | null;
+    view_type?: string | null;
+  }>;
+}
+
+export interface Restaurant extends BaseVenue {
+  restaurant_id?: string;
+  cuisine_type?: string[];
+  price_range?: string; // $, $$, $$$, $$$$
+  meal_services?: string[]; // breakfast, lunch, dinner, brunch
+}
+
+export interface Experience extends BaseVenue {
+  experience_id?: string;
+  type: string; // paid_experience, free_attraction, landmark
+  category: string; // cultural, historical, adventure, food, entertainment
+  subcategory?: string | null;
+  visit_duration?: string | null; // 30_minutes, 2_hours, half_day, full_day
+  activity_level?: string | null; // low, moderate, high
+}
+
+export type VenueData = Hotel | Restaurant | Experience;
+
+// Legacy Venue interface - keeping for backward compatibility
 export interface Venue {
   name: string;
   category?: string;
+  mediaIds?: string[]; // Array of all mediaIds that reference this venue
+  mediaUrl?: string; // URL of the media where this venue was discovered
   location: {
     fullAddress?: string;
     street?: string;
@@ -18,7 +69,8 @@ export interface Venue {
     state_province?: string | null;
     postcode: string;
     country?: string;
-    // Removed latitude and longitude - will be geocoded separately
+    lat?: number; // Added for coordinate storage
+    lon?: number; // Added for coordinate storage
     // Keep legacy address field for backward compatibility
     address?: string;
   };
@@ -136,7 +188,11 @@ export interface Perspective {
   caption: string;
   mediaDescription: string[];
   audioDescription: string[];
-  venues: Array<{ name: string; confidence: number }>;
+  venues: Array<{ 
+    name: string; 
+    confidence: number;
+    venueId?: string; // Database ID for saved venues
+  }>;
   locations: Array<{ name: string; confidence: number }>;
   context: {
     l: string;
