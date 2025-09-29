@@ -1,0 +1,36 @@
+{
+  "name": "venue-enrichment",
+  "version": "1.0.0",
+  "description": "Dedicated venue enrichment service for deep venue data processing",
+  "type": "module",
+  "scripts": {
+    "build": "nitro build",
+    "dev": "nitro dev",
+    "preview": "nitro preview",
+    "start": "node .output/server/index.mjs"
+  },
+  "dependencies": {
+    "@social-crawl/infrastructure": "workspace:*",
+    "@aws-sdk/client-s3": "^3.862.0",
+    "@azure/service-bus": "^7.9.5",
+    "@azure/storage-blob": "^12.28.0",
+    "@google/genai": "^1.12.0",
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.11.0",
+    "cheerio": "^1.1.2",
+    "dotenv": "^17.2.1",
+    "fluent-ffmpeg": "^2.1.3",
+    "h3": "^1.15.3",
+    "https-proxy-agent": "^7.0.6",
+    "mongodb": "^6.18.0",
+    "nitropack": "^2.12.4",
+    "ofetch": "^1.4.1",
+    "playwright": "^1.49.1",
+    "puppeteer": "^23.9.0",
+    "string-similarity": "^4.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "typescript": "^5.8.3"
+  }
+}
