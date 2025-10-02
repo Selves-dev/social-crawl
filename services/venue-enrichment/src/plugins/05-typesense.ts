@@ -7,10 +7,13 @@ import { logger } from '../utils/shared/logger'
 import type { HotelDocument } from '../types/hotel'
 
 /**
- * Typesense Sync Plugin
+ * Typesense Sync Plugin - Two Collection Strategy
  * Initializes Typesense client and sets up MongoDB Change Stream
- * to automatically sync hotel documents to Typesense search index
- * Uses single 'hotels' collection with nested rooms
+ * to automatically sync hotel documents to Typesense search indexes
+ * 
+ * TWO COLLECTIONS:
+ * - hotels: Parent entities with aggregated stats
+ * - rooms: Child entities with hotel_id reference
  */
 export default defineNitroPlugin(async () => {
   // Initialize Typesense client
@@ -49,7 +52,7 @@ export default defineNitroPlugin(async () => {
     const hotelsDb = db.getSpecificDatabase(hotelsDbName)
     const hotelsCollection = hotelsDb.collection<HotelDocument>('hotels')
 
-    logger.info('🔍 Setting up MongoDB Change Stream for Typesense sync', {
+    logger.info('🔍 Setting up MongoDB Change Stream for Typesense sync (Two Collection Strategy)', {
       service: 'typesense-sync',
       database: hotelsDbName,
       collection: 'hotels'
@@ -96,10 +99,10 @@ export default defineNitroPlugin(async () => {
           return
         }
 
-        // Transform hotel document to Typesense format
-        const typesenseHotel = transformHotelForTypesense(hotelDoc)
+        // Transform hotel document to Typesense format (two collections)
+        const { hotel, rooms } = transformHotelForTypesense(hotelDoc)
 
-        if (!typesenseHotel) {
+        if (!hotel) {
           logger.error('Failed to transform hotel document for Typesense', undefined as any, {
             service: 'typesense-sync',
             hotelId: hotelDoc._id
@@ -116,16 +119,51 @@ export default defineNitroPlugin(async () => {
           return
         }
 
-        // Index hotel in hotels collection (includes nested rooms)
-        await client.collections('hotels').documents().upsert(typesenseHotel)
+        // Index hotel in hotels collection
+        await client.collections('hotels').documents().upsert(hotel)
 
         logger.info('✅ Hotel document indexed in Typesense', {
           service: 'typesense-sync',
           hotelId: hotelDoc._id,
           hotelName: hotelDoc.name,
-          roomCount: hotelDoc.rooms?.length || 0,
           operationType
         })
+
+        // Index all rooms in rooms collection
+        if (rooms.length > 0) {
+          // First, delete existing rooms for this hotel to handle room deletions
+          try {
+            await client.collections('rooms').documents().delete({
+              filter_by: `hotel_id:=${hotel.id}`
+            })
+          } catch (error) {
+            // Ignore errors if no rooms exist
+            logger.debug('No existing rooms to delete or delete failed', {
+              service: 'typesense-sync',
+              hotelId: hotel.id
+            })
+          }
+
+          // Then upsert all current rooms
+          for (const room of rooms) {
+            try {
+              await client.collections('rooms').documents().upsert(room)
+            } catch (error) {
+              logger.error('Failed to index room in Typesense', error as Error, {
+                service: 'typesense-sync',
+                hotelId: hotel.id,
+                roomId: room.id
+              })
+            }
+          }
+
+          logger.info('✅ Room documents indexed in Typesense', {
+            service: 'typesense-sync',
+            hotelId: hotelDoc._id,
+            roomCount: rooms.length,
+            operationType
+          })
+        }
 
       } catch (error) {
         const documentId = 'documentKey' in change ? change.documentKey?._id : 'unknown'
@@ -149,10 +187,11 @@ export default defineNitroPlugin(async () => {
       })
     })
 
-    logger.info('✅ MongoDB Change Stream active - Typesense sync enabled', {
+    logger.info('✅ MongoDB Change Stream active - Typesense sync enabled (Two Collections)', {
       service: 'typesense-sync',
       database: hotelsDbName,
-      collection: 'hotels'
+      collection: 'hotels',
+      strategy: 'hotels + rooms collections'
     })
 
   } catch (error) {

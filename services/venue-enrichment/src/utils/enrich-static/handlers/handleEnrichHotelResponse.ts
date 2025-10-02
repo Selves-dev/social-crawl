@@ -173,10 +173,18 @@ export async function handleEnrichHotelResponse(message: any) {
     const hotelsDb = db.getSpecificDatabase(process.env['hotels-db-name'] || 's_payload');
     const collection = hotelsDb.collection<HotelDocument>('hotels');
     
+    // Add status and timestamp metadata
+    const now = new Date();
+    const hotelWithMetadata = {
+      ...hotel,
+      _status: 'published',
+      updatedAt: now
+    };
+    
     // Upsert hotel document by _id
     const result = await collection.updateOne(
       { _id: hotel._id },
-      { $set: hotel },
+      { $set: hotelWithMetadata },
       { upsert: true }
     );
     
