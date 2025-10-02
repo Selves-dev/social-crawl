@@ -98,7 +98,7 @@ async function fetchOpenAIResponse(messages: any[], options: { maxTokens?: numbe
         'Content-Type': 'application/json',
         'api-key': config.apiKey
       },
-      timeout: 30000 // 30 second timeout
+      timeout: 60000 // 60 second timeout
     });
 
     const data = response.data;

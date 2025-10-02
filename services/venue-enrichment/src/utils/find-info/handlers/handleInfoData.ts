@@ -4,9 +4,12 @@ import { sendToPostOffice } from '../../shared/postOffice/postman';
 
 /**
  * Parses the AI response and processes each query by sending it to the post office.
+ * Expects message.payload to contain the AI response, and message.workflow for context.
  */
-export async function handleInfoData(aiResponse: any, workflowContext: any): Promise<void> {
+export async function handleInfoData(message: { util: string; type: string; workflow: any; payload: any }): Promise<void> {
   try {
+    const { payload, workflow } = message;
+    const aiResponse = payload;
     logger.info('[find-info-response] Processing AI response for find-info', { aiResponse });
     const text = aiResponse?.result?.text || aiResponse?.text || aiResponse;
     if (!text || typeof text !== 'string') {
@@ -45,7 +48,7 @@ export async function handleInfoData(aiResponse: any, workflowContext: any): Pro
         type: 'search',
         apiSecret: process.env['taash-secret'],
         workflow: {
-          ...workflowContext,
+          ...workflow,
           venueName,
           venueLocation,
           query

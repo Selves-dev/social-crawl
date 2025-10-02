@@ -1,0 +1,15 @@
+{
+  "name": "typesense-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "create-collection": "node create-typesense-collection.js",
+    "backfill": "node backfill-hotels-to-typesense.js",
+    "test-search": "node test-typesense-search.js"
+  },
+  "dependencies": {
+    "typesense": "^2.1.0",
+    "mongodb": "^6.18.0",
+    "dotenv": "^17.2.1"
+  }
+}

@@ -62,6 +62,7 @@ export function startAIServiceIntray() {
           result,
           mediaUrl: payload?.mediaUrl,
           mediaId: payload?.mediaId, // Pass through mediaId
+          aiPayload: payload?.aiPayload, // Pass through original aiPayload for reference data
         }
       });
       logger.info('[AI-Service-Intray] Response sent to PostOffice');

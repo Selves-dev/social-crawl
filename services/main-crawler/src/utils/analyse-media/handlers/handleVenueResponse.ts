@@ -1,7 +1,48 @@
 import { logger } from '../../shared/logger';
 import type { VenueData, Hotel, Restaurant, Experience, Venue } from '../../shared/types';
 import { saveVenue } from '../../shared/dbStore';
-import { getCoordinates, enrichHotelVenue } from './venueUtils';
+// --- Venue geocoding utilities (moved from venueUtils.ts) ---
+const GEOAPIFY_API_KEY = process.env['geoapify-api-key'];
+
+function createGeocodeParams(venue: any, countryCode: string): URLSearchParams {
+  const params = new URLSearchParams();
+  params.append('format', 'json');
+  params.append('apiKey', GEOAPIFY_API_KEY || '');
+
+  params.append('postcode', venue.location?.zipcode);
+  params.append('country', countryCode);
+
+  // For non-GB countries, add additional address details for better matching
+  if (countryCode !== 'GB') {
+    const location = venue.location;
+    if (venue.name) params.append('name', venue.name);
+    if (location?.street) params.append('street', location.street);
+    if (location?.address) params.append('street', location.address); // fallback for legacy field
+    if (location?.city) params.append('city', location.city);
+    if (location?.state_province) params.append('state', location.state_province);
+  }
+
+  return params;
+}
+
+async function getCoordinates(venue: any, countryCode: string): Promise<{ lat: number; lon: number } | null> {
+  const postcode = venue.location?.zipcode;
+  if (!postcode) return null;
+
+  try {
+    const params = createGeocodeParams(venue, countryCode);
+    const response = await fetch(`https://api.geoapify.com/v1/geocode/search?${params.toString()}`);
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    const result = data.results?.[0];
+    
+    return result?.lat && result?.lon ? { lat: result.lat, lon: result.lon } : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Extracts JSON from AI response text that may contain markdown code blocks
@@ -108,10 +149,6 @@ export async function handleVenueResponse(message: any): Promise<any> {
       venue.location.lon = coordinates.lon;
     }
     
-    // Enrich hotel venues with hotelCode from hotelston database
-    if (venue.type === 'Hotel') {
-      await enrichHotelVenue(venue, countryCode);
-    }
 
     // Add mediaUrl to venue if available
     if (mediaUrl) {

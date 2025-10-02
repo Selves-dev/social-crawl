@@ -29,8 +29,8 @@ export async function handleAnalyseMedia(message: PostOfficeMessage) {
 
   logger.info('BuildAnalysisPrompt called. Preparing to send image/text analysis job to ai-service via postman');
   const postmanPayload = {
-    util: 'ai-service',
-    type: 'text-image',
+  util: 'ai-service',
+  type: 'text-image',
     apiSecret: process.env['taash-secret'],
     workflow,
     payload: {

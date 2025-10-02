@@ -1,14 +1,17 @@
-// Dummy webpage parser for 'web' platform
-export async function webpageParser(url: string, options?: any): Promise<any> {
-  // TODO: Implement actual webpage parsing logic
-  return {
+
+import TurndownService from 'turndown';
+
+// Converts HTML to Markdown using turndown
+export function webpageParser(html: string, url: string) {
+  const turndownService = new TurndownService();
+  const markdown = turndownService.turndown(html);
+  return [{
+    success: true,
     url,
-    type: 'webpage',
-    title: null,
-    description: null,
-    images: [],
-    content: null,
-    meta: {},
-    ...options
-  };
+    markdown,
+    platform: 'web'
+  }];
+// ...existing code...
+
+
 }

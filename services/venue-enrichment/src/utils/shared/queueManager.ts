@@ -1,5 +1,9 @@
 import type { SearchCrawlJob, MediaScrapeJob, PrepMediaJob, AnalyseMediaJob } from './types';
 import { logger } from './logger';
+import { getVenueMediaQueue } from '../../utils/get-venue-media/throttleQueue';
+import { prepMediaQueue } from '../../utils/prep-media/throttleQueue';
+import { analyseMediaQueue } from '../../utils/analyse-media/throttleQueue';
+import { aiServiceQueue } from '../../utils/ai-service/throttleQueue';
 
 // TODO: Service-specific queues will be injected by each service
 // This provides the base queue management infrastructure
@@ -35,12 +39,10 @@ export class QueueManager {
   // Centralized queue-config - easier to maintain and extend
   // Note: handlers are registered by individual letterboxes, not here
   private static readonly queueConfigs: QueueConfig[] = [
+    { name: 'get-venue-media', instance: getVenueMediaQueue },
     { name: 'prep-media', instance: prepMediaQueue },
-    { name: 'ai-service', instance: aiServiceQueue },
-    //{ name: 'search-crawl', instance: searchCrawlQueue },
-    //{ name: 'crawl-media', instance: crawlMediaQueue },
     { name: 'analyse-media', instance: analyseMediaQueue },
-    { name: 'get-media', instance: getMediaQueue }
+    { name: 'ai-service', instance: aiServiceQueue }
   ];
 
   // Helper method to find queue-config

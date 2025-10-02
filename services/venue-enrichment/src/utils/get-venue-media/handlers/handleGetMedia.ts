@@ -26,7 +26,7 @@ export async function handleGetMedia(message: PostOfficeMessage): Promise<void> 
       logger.error(`[get-venue-media] No result from crawlSearch: job=${JSON.stringify(job)}, platform=${platform}`);
       return;
     }
-    try {
+    /*try {
       if (!workflow) {
         logger.error('[get-venue-media] Missing workflow context, cannot route to prep-media', new Error('Missing workflow context'), { job });
         return;
@@ -58,11 +58,8 @@ export async function handleGetMedia(message: PostOfficeMessage): Promise<void> 
           blobUrl,
         }
       });
-      logger.info('[get-venue-media] handleGetMedia END - blobUrl routed to prep-media', { blobUrl });
-    } catch (err) {
-      logger.error('[get-venue-media] Failed to route blobUrl to post-office for prep-media', err instanceof Error ? err : new Error(String(err)), { job });
-    }
-  } catch (error) {
-    logger.error('[get-venue-media] Error processing message', error instanceof Error ? error : new Error(String(error)));
+    */
+  } catch (err) {
+    logger.error('[get-venue-media] Error in handleGetMedia', err, { message });
   }
 }

@@ -1,4 +1,0 @@
-packages:
-  - 'packages/infrastructure'
-  - 'services/main-crawler'
-  - 'services/venue-enrichment'

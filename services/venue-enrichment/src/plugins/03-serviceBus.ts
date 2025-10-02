@@ -1,6 +1,5 @@
 import { defineNitroPlugin } from 'nitropack/runtime'
 import { logger, serviceBus, getServiceBusConfigFromEnv, QueueManager } from '../utils/shared'
-import { startGetMediaIntray } from '../utils/get-media/letterbox'
 import { startGetVenueMediaIntray } from '../utils/get-venue-media'
 import { startPrepMediaIntray } from '../utils/prep-media/letterbox'
 import { startAnalyseMediaIntray } from '../utils/analyse-media/letterbox'
@@ -16,7 +15,7 @@ export default defineNitroPlugin(async (nitroApp) => {
     await QueueManager.initializeAllQueues()
     
     // Register queue subscribers (intrays) - letterboxes handle queue subscription
-  startGetMediaIntray()
+  // startGetMediaIntray()
   startGetVenueMediaIntray()
     startPrepMediaIntray()
     startAnalyseMediaIntray()

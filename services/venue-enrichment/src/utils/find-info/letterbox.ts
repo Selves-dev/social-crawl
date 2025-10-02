@@ -13,12 +13,12 @@ const findInfoLetterbox = async (message: any) => {
 
   switch (type) {
     case 'find-info-request': {
-      const result = await handleFindInfo(workflow);
+      const result = await handleFindInfo(message);
       return result;
     }
     case 'find-info-response': {
       // Call handleInfoData as the response handler (to be implemented)
-      return handleInfoData(payload, workflow);
+      return handleInfoData(message);
     }
     default:
       logger.warn(`[find-info letterbox] Unknown message type: ${type}`);

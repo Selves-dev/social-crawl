@@ -10,7 +10,6 @@
     "start": "node .output/server/index.mjs"
   },
   "dependencies": {
-    "@social-crawl/infrastructure": "workspace:*",
     "@aws-sdk/client-s3": "^3.862.0",
     "@azure/service-bus": "^7.9.5",
     "@azure/storage-blob": "^12.28.0",
@@ -27,7 +26,8 @@
     "ofetch": "^1.4.1",
     "playwright": "^1.49.1",
     "puppeteer": "^23.9.0",
-    "string-similarity": "^4.0.4"
+    "string-similarity": "^4.0.4",
+    "typesense": "^2.1.0"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",

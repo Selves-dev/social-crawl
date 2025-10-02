@@ -1,4 +1,5 @@
 
+
 import { logger } from '../../shared/logger';
 import { sendToPostOffice } from '../../shared/postOffice/postman';
 
@@ -6,21 +7,22 @@ import { sendToPostOffice } from '../../shared/postOffice/postman';
  * Handler for find-info jobs. Builds the prompt and sends it to the ai-service.
  * Expects message.workflow to contain venueName and venueLocation.
  */
-export async function handleFindInfo(workflowContext: { venueName: string; venueLocation: string; [key: string]: any }): Promise<void> {
+export async function handleFindInfo(message: { util: string; type: string; workflow: { venueName: string; venueLocation: string; [key: string]: any }; payload: any }): Promise<void> {
   try {
+    const { workflow } = message;
     logger.info('[find-info-request] Starting find-info request', {
-      venueName: workflowContext?.venueName,
-      venueLocation: workflowContext?.venueLocation
+      venueName: workflow?.venueName,
+      venueLocation: workflow?.venueLocation
     });
 
     const { buildFindInfoPrompt } = await import('./buildFindInfoPrompt');
-    const prompt = await buildFindInfoPrompt(workflowContext.venueName, workflowContext.venueLocation);
+    const prompt = await buildFindInfoPrompt(workflow.venueName, workflow.venueLocation);
 
     await sendToPostOffice({
       util: 'ai-service',
       type: 'text',
       apiSecret: process.env['taash-secret'],
-      workflow: workflowContext,
+      workflow,
       payload: {
         prompt,
         responseHandler: {

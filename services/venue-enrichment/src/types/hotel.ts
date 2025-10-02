@@ -1,21 +1,21 @@
 /**
  * TypeScript interfaces for the Hotel schema from groundry.hotels collection
- * Generated from MongoDB sample document on 2025-09-27
+ * Updated 2025-10-02: Separated internal unique ID from external provider IDs
  */
 
 export interface HotelDocument {
-  _id: string;
+  _id: string; // MongoDB ObjectId
   createdAt: string;
   name: string;
-  slug: string;
+  slug: string; // URL-friendly slug (e.g., "peninsula-shanghai-k3r4")
+  selves_id?: string; // Our unique contextual ID: [hotel-name-city]-[entropy] (e.g., "peninsula-shanghai-k3r4")
   rooms: HotelRoom[];
   __v?: number;
   locationSlug?: string;
   contact?: HotelContact;
   identity?: HotelIdentity;
   location?: HotelLocation;
-  registryId?: string;
-  amenitiesAndServices?: HotelAmenitiesAndServices;
+  externalIds?: HotelExternalIds; // IDs from external providers (Hotelston, HBX, Roibos, etc.)
   foodAndBeverage?: HotelFoodAndBeverage;
   marketPosition?: HotelMarketPosition;
   media?: HotelMedia;
@@ -24,7 +24,19 @@ export interface HotelDocument {
   sources?: HotelSource[];
   sustainability?: HotelSustainability;
   facilities?: HotelFacilities;
+  references?: HotelReferences; // References to related data in other collections
   contentLastUpdated?: string;
+}
+
+/**
+ * External provider IDs
+ * Maps provider names to their IDs for this hotel
+ */
+export interface HotelExternalIds {
+  hotelston?: string;
+  hbx?: string;
+  roibos?: string;
+  [key: string]: string | undefined; // Allow additional providers dynamically
 }
 
 export interface HotelRoom {
@@ -131,7 +143,6 @@ export interface HotelContact {
 }
 
 export interface HotelIdentity {
-  name?: string;
   starRating?: number;
   priceTier?: string;
   hotelType?: string[];
@@ -157,22 +168,6 @@ export interface PointOfInterest {
   name: string;
   walk_time_minutes: number;
   category: string;
-}
-
-export interface HotelAmenitiesAndServices {
-  hotelAmenities?: string[];
-  parking?: {
-    available: boolean;
-    onSite: boolean;
-    cost?: string;
-  };
-  concierge?: string;
-  airportShuttle?: {
-    available: boolean;
-    details?: string;
-  };
-  spa?: string;
-  businessAndEvents?: string[];
 }
 
 export interface HotelFoodAndBeverage {
@@ -205,9 +200,10 @@ export interface HotelMedia {
   primaryImage?: {
     url: string;
     alt?: string;
+    source?: 'hotelston' | 'web' | 'social'; // Track where the image came from
   };
-  gallery?: MediaGalleryItem[];
-  photoCount?: number;
+  gallery?: MediaGalleryItem[]; // Static images (will be populated from Hotelston later)
+  photoCount?: number; // Count of static images available
 }
 
 export interface HotelPolicies {
@@ -247,6 +243,11 @@ export interface HotelSource {
 export interface HotelSustainability {
   certifications?: string[];
   practices?: string[];
+}
+
+export interface HotelReferences {
+  perspectives?: string[]; // mediaIds from original venues table that reference perspectives collection
+  // Future: Add other reference types as needed (e.g., reviews, bookings, etc.)
 }
 
 export interface HotelFacilities {
