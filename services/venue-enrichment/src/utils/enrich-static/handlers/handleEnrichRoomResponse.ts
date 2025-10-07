@@ -1,3 +1,4 @@
+import { ObjectId } from 'mongodb';
 import { logger } from '../../shared/logger';
 import { db } from '../../shared/database';
 import { HotelDocument, HotelRoom } from '../../../types/hotel';
@@ -110,6 +111,9 @@ export async function handleEnrichRoomResponse(message: any) {
     const hotelsDb = db.getSpecificDatabase(process.env['hotels-db-name'] || 's_payload');
     const collection = hotelsDb.collection<HotelDocument>('hotels');
 
+    // Convert venue_id to ObjectId if it's a string
+    const venueObjectId = typeof venue_id === 'string' ? new ObjectId(venue_id) : venue_id;
+
     let upserted = 0;
     const skippedEntries: any[] = [];
 
@@ -138,7 +142,7 @@ export async function handleEnrichRoomResponse(message: any) {
 
       // First try to update existing room
       const updateResult = await collection.updateOne(
-        { _id: venue_id, 'rooms.roomId': roomId },
+        { _id: venueObjectId, 'rooms.roomId': roomId },
         { $set: { 'rooms.$': roomData } }
       );
 
@@ -146,23 +150,23 @@ export async function handleEnrichRoomResponse(message: any) {
         // Room existed and was updated
         upserted += updateResult.modifiedCount;
         logger.info('[enrich-static] Final room registry entry updated', 
-          { venue_id, roomId, modified: updateResult.modifiedCount });
+          { venue_id: venueObjectId, roomId, modified: updateResult.modifiedCount });
       } else {
         // Room doesn't exist, add it
         const addResult = await collection.updateOne(
-          { _id: venue_id },
+          { _id: venueObjectId },
           { $push: { rooms: roomData } },
           { upsert: true }
         );
         
         upserted += addResult.upsertedId ? 1 : addResult.modifiedCount;
         logger.info('[enrich-static] Final room registry entry added', 
-          { venue_id, roomId, result: addResult });
+          { venue_id: venueObjectId, roomId, result: addResult });
       }
     }
 
     logger.info('[enrich-static] Final room registry entries batch upserted', 
-      { venue_id, upserted, skipped: skippedEntries.length });
+      { venue_id: venueObjectId, upserted, skipped: skippedEntries.length });
 
     if (skippedEntries.length > 0) {
       logger.error('[enrich-static] Final registry entries missing roomId', 

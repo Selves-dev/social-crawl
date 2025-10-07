@@ -8,12 +8,53 @@ function cleanJsonString(text: string): string {
   // Remove markdown code blocks
   let cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '');
   
-  // Find the first { and last } to extract just the JSON object
+  // Try to find and extract just the JSON part
+  // Look for the first { and the matching closing }
   const firstBrace = cleaned.indexOf('{');
-  const lastBrace = cleaned.lastIndexOf('}');
   
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  if (firstBrace === -1) {
+    return cleaned.trim();
+  }
+  
+  // Use a simple brace counter to find the matching closing brace
+  let braceCount = 0;
+  let inString = false;
+  let escapeNext = false;
+  let endIndex = -1;
+  
+  for (let i = firstBrace; i < cleaned.length; i++) {
+    const char = cleaned[i];
+    
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+    
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+    
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    
+    if (!inString) {
+      if (char === '{') {
+        braceCount++;
+      } else if (char === '}') {
+        braceCount--;
+        if (braceCount === 0) {
+          endIndex = i;
+          break;
+        }
+      }
+    }
+  }
+  
+  if (endIndex !== -1) {
+    return cleaned.substring(firstBrace, endIndex + 1).trim();
   }
   
   return cleaned.trim();

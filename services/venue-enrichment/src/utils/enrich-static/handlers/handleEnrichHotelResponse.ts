@@ -1,3 +1,4 @@
+import { ObjectId } from 'mongodb';
 import { logger } from '../../shared/logger';
 import { db } from '../../shared/database';
 import { HotelDocument } from '../../../types/hotel';
@@ -173,23 +174,32 @@ export async function handleEnrichHotelResponse(message: any) {
     const hotelsDb = db.getSpecificDatabase(process.env['hotels-db-name'] || 's_payload');
     const collection = hotelsDb.collection<HotelDocument>('hotels');
     
+    // Convert _id to ObjectId if it's a string
+    const objectId = typeof hotel._id === 'string' ? new ObjectId(hotel._id) : hotel._id;
+    
+    // Remove _id from hotel object before spreading to avoid string _id being set
+    const { _id: _, ...hotelWithoutId } = hotel;
+    
     // Add status and timestamp metadata
     const now = new Date();
     const hotelWithMetadata = {
-      ...hotel,
+      ...hotelWithoutId,
       _status: 'published',
       updatedAt: now
     };
     
-    // Upsert hotel document by _id
+    // Upsert hotel document by _id (use $setOnInsert for _id to ensure it's ObjectId)
     const result = await collection.updateOne(
-      { _id: hotel._id },
-      { $set: hotelWithMetadata },
+      { _id: objectId },
+      { 
+        $set: hotelWithMetadata,
+        $setOnInsert: { _id: objectId }
+      },
       { upsert: true }
     );
     
     logger.info('[enrich-static] Hotel upserted successfully', { 
-      _id: hotel._id, 
+      _id: objectId, 
       upserted: !!result.upsertedId,
       modified: result.modifiedCount,
       fieldsPresent 
@@ -197,7 +207,7 @@ export async function handleEnrichHotelResponse(message: any) {
     
     return { 
       status: 'success', 
-      _id: hotel._id, 
+      _id: objectId, 
       upserted: result.upsertedId || result.modifiedCount,
       fieldsPresent,
       warnings: warnings.length > 0 ? warnings : undefined

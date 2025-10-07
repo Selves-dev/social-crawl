@@ -34,13 +34,14 @@ Your task is to complete two steps in order:
 -   **GOOD:** "places to eat in Shoreditch"
 -   **BAD:** "Find the best hidden gem farm-to-table restaurant in the Shoreditch area"
 
-Based on the location you selected, generate **exactly 5 Google-style search queries**. The queries must fit these categories:
+Based on the location you selected, generate **exactly 1 Google-style search query** for accommodation.
 
 1.  A query for finding accommodation, like "places to stay in [Location]".
-2.  A query for finding restaurants, like "places to eat in [Location]".
-3.  A query for finding bars or pubs, like "bars in [Location]".
-4.  A query for finding activities, like "things to do in [Location]".
-5.  A query for finding hidden gems, like "hidden gems in [Location]".
+// TEMPORARILY DISABLED - Will re-enable later:
+// 2.  A query for finding restaurants, like "places to eat in [Location]".
+// 3.  A query for finding bars or pubs, like "bars in [Location]".
+// 4.  A query for finding activities, like "things to do in [Location]".
+// 5.  A query for finding hidden gems, like "hidden gems in [Location]".
 
 **Query Rules:**
 -   **BE GENERIC:** Queries must be simple and broad. Avoid specific adjectives like 'boutique', 'craft', 'luxury'.
@@ -57,7 +58,7 @@ ${JSON.stringify(normalizedCrawlData)}
 - The JSON object MUST contain EXACTLY these keys: "l", "cc", and "queries".
 - The "l" value must be the location name you selected.
 - The "cc" (country code) must be the two-letter ISO code for the location's country.
-- The "queries" key MUST contain an array of exactly five string queries, in the order above.
+- The "queries" key MUST contain an array of exactly ONE string query for accommodation only.
 - Ensure your output is valid JSON with no trailing commas or extra text.
 
 ## Example Output:
@@ -65,11 +66,7 @@ ${JSON.stringify(normalizedCrawlData)}
   "l": "Shoreditch",
   "cc": "GB",
   "queries": [
-    "places to stay in shoreditch",
-    "restaurants in shoreditch",
-    "bars in shoreditch",
-    "things to do in shoreditch",
-    "hidden gems in shoreditch"
+    "places to stay in shoreditch"
   ]
 }
 `;

@@ -8,8 +8,9 @@
     "test-search": "node test-typesense-search.js"
   },
   "dependencies": {
-    "typesense": "^2.1.0",
+    "@elastic/elasticsearch": "^9.1.1",
+    "dotenv": "^17.2.1",
     "mongodb": "^6.18.0",
-    "dotenv": "^17.2.1"
+    "typesense": "^2.1.0"
   }
 }

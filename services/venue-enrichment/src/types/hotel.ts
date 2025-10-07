@@ -3,8 +3,10 @@
  * Updated 2025-10-02: Separated internal unique ID from external provider IDs
  */
 
+import type { ObjectId } from 'mongodb';
+
 export interface HotelDocument {
-  _id: string; // MongoDB ObjectId
+  _id: string | ObjectId; // MongoDB ObjectId (string or ObjectId type)
   createdAt: string;
   name: string;
   slug: string; // URL-friendly slug (e.g., "peninsula-shanghai-k3r4")
@@ -26,6 +28,10 @@ export interface HotelDocument {
   facilities?: HotelFacilities;
   references?: HotelReferences; // References to related data in other collections
   contentLastUpdated?: string;
+  // NEW: AI-powered and inclusive search fields (2025-10-07)
+  accessibilityFeatures?: HotelAccessibilityFeatures;
+  inclusivitySignals?: HotelInclusivitySignals;
+  accessInformation?: HotelAccessInformation;
 }
 
 /**
@@ -52,14 +58,22 @@ export interface HotelRoom {
   reviewSnippets?: RoomReviewSnippet[];
   policyOverrides?: RoomPolicyOverrides;
   id: string;
+  // NEW: AI-powered intelligent room matching fields (2025-10-07)
+  dataConfidence?: RoomDataConfidence;
+  decisionDimensions?: RoomDecisionDimensions;
+  tradeOffs?: RoomTradeOffs;
+  requirements?: RoomRequirements;
+  satisfactionPredictors?: RoomSatisfactionPredictors;
+  comparableRooms?: RoomComparableRoom[];
 }
 
 export interface RoomIdentity {
   name: string;
   roomType: string;
-  sizeSqMeters?: number;
+  sizeSqMeters?: number | { min: number; max: number };
   capacity?: RoomCapacity;
   description?: string;
+  descriptionShort?: string;
 }
 
 export interface RoomCapacity {
@@ -264,6 +278,93 @@ export interface HotelFacilities {
   };
   spa?: string;
   businessAndEvents?: string[];
+}
+
+// ===== NEW AI-POWERED AND INCLUSIVE SEARCH INTERFACES (2025-10-07) =====
+// These interfaces support advanced accessibility features, inclusive search,
+// and AI-powered intelligent room matching capabilities.
+
+// Hotel-level interfaces
+export interface HotelAccessibilityFeatures {
+  wheelchairAccess?: boolean;
+  mobilityAids?: string[];
+  visualImpairmentSupport?: string[];
+  hearingImpairmentSupport?: string[];
+  neurodivergentSupport?: string[];
+  serviceAnimalPolicy?: string;
+  accessibleRoomCount?: number;
+  accessibilityDescription?: string;
+}
+
+export interface HotelInclusivitySignals {
+  lgbtqWelcoming?: boolean;
+  genderNeutralBathrooms?: boolean;
+  culturalAccommodations?: string[];
+  languageSupport?: string[];
+  inclusivityCertifications?: string[];
+  diversityStatement?: string;
+}
+
+export interface HotelAccessInformation {
+  entranceAccessibility?: string;
+  parkingAccessibility?: string;
+  elevatorAccess?: boolean;
+  accessibleCommonAreas?: string[];
+  emergencyProtocols?: string;
+  assistanceAvailability?: string;
+}
+
+// Room-level interfaces
+export interface RoomDataConfidence {
+  completeness?: number; // 0-100 score
+  lastVerified?: string; // ISO date
+  source?: 'hotelston' | 'web' | 'enrichment' | 'manual';
+  verificationNotes?: string;
+}
+
+export interface RoomDecisionDimensions {
+  primaryUseCase?: string[]; // e.g., ['business', 'leisure', 'family']
+  keyDifferentiators?: string[];
+  bestFor?: string[];
+  notIdealFor?: string[];
+  valueProposition?: string;
+}
+
+export interface RoomTradeOffs {
+  advantages?: string[];
+  disadvantages?: string[];
+  comparedToSimilar?: {
+    roomType: string;
+    pros: string[];
+    cons: string[];
+  }[];
+}
+
+export interface RoomRequirements {
+  minimumStay?: number;
+  ageRestrictions?: string;
+  specialRequests?: string[];
+  deposits?: string;
+  advanceBookingRequired?: boolean;
+}
+
+export interface RoomSatisfactionPredictors {
+  likelyToEnjoyIf?: string[];
+  mayDislikeIf?: string[];
+  recommendedFor?: string[];
+  topReviewThemes?: {
+    positive: string[];
+    negative: string[];
+  };
+}
+
+export interface RoomComparableRoom {
+  roomId: string;
+  roomName: string;
+  priceDifference?: number;
+  keyDifferences?: string[];
+  upgradeReasons?: string[];
+  downgradeReasons?: string[];
 }
 
 // Utility types for common operations

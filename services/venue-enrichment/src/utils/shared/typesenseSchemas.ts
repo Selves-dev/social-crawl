@@ -38,6 +38,7 @@ export const hotelsSchema: CollectionCreateSchema = {
     { name: 'brand_affiliation', type: 'string', facet: true, optional: true },
     
     // Location
+    { name: 'location_slug', type: 'string', facet: false, optional: true },
     { name: 'country', type: 'string', facet: true, optional: true },
     { name: 'region', type: 'string', facet: true, optional: true },
     { name: 'city', type: 'string', facet: true, optional: true },
@@ -113,6 +114,7 @@ export const roomsSchema: CollectionCreateSchema = {
     // Denormalized hotel context (for display in search results)
     { name: 'hotel_name', type: 'string', facet: false },
     { name: 'hotel_slug', type: 'string', facet: false },
+    { name: 'location_slug', type: 'string', facet: false, optional: true },
     { name: 'city', type: 'string', facet: true, optional: true },
     { name: 'location', type: 'geopoint', facet: false, optional: true },
     
@@ -160,6 +162,7 @@ export interface TypesenseHotelDocument {
   price_tier?: string
   hotel_types?: string[]
   brand_affiliation?: string
+  location_slug?: string
   country?: string
   region?: string
   city?: string
@@ -205,6 +208,8 @@ export interface TypesenseRoomDocument {
   hotel_id: string
   hotel_name: string
   hotel_slug: string
+  location_slug?: string
+  hotel_image_url?: string
   city?: string
   location?: [number, number] // [lat, lon]
   size_sqm_min?: number

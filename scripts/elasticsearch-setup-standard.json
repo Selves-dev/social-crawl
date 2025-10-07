@@ -1,0 +1,148 @@
+{
+  "_comment": "Elasticsearch indices with standard analyzer + fuzziness (no ngrams needed for full-word search)",
+  "hotels_index": {
+    "mappings": {
+      "properties": {
+        "id": { "type": "keyword" },
+        "name": { 
+          "type": "text",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
+        "slug": { "type": "keyword" },
+        "selves_id": { "type": "keyword" },
+        
+        "star_rating": { "type": "integer" },
+        "price_tier": { "type": "keyword" },
+        "hotel_types": { "type": "keyword" },
+        "brand_affiliation": { "type": "keyword" },
+        
+        "location_slug": { "type": "keyword" },
+        "country": { "type": "keyword" },
+        "region": { "type": "keyword" },
+        "city": { 
+          "type": "text",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
+        "neighborhood": { 
+          "type": "text",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
+        "location": { "type": "geo_point" },
+        "walkability_score": { "type": "integer" },
+        
+        "description": { "type": "text" },
+        "unique_selling_points": { "type": "text" },
+        
+        "amenities": { "type": "keyword" },
+        "has_spa": { "type": "boolean" },
+        "has_parking": { "type": "boolean" },
+        "has_airport_shuttle": { "type": "boolean" },
+        "pet_friendly": { "type": "boolean" },
+        
+        "restaurant_count": { "type": "integer" },
+        "restaurant_cuisines": { "type": "keyword" },
+        "has_michelin_restaurant": { "type": "boolean" },
+        "breakfast_included": { "type": "boolean" },
+        
+        "review_score": { "type": "float" },
+        "review_count": { "type": "integer" },
+        "location_score": { "type": "float" },
+        "cleanliness_score": { "type": "float" },
+        "service_score": { "type": "float" },
+        
+        "sustainability_certifications": { "type": "keyword" },
+        
+        "room_type_count": { "type": "integer" },
+        "room_types_available": { "type": "keyword" },
+        "min_room_size_sqm": { "type": "float" },
+        "max_room_size_sqm": { "type": "float" },
+        "min_room_price": { "type": "float" },
+        "max_room_price": { "type": "float" },
+        "max_occupancy_available": { "type": "integer" },
+        "currency": { "type": "keyword" },
+        
+        "nearby_poi_names": { "type": "text" },
+        "nearby_poi_categories": { "type": "keyword" },
+        
+        "created_at": { "type": "date" },
+        "content_last_updated": { "type": "date" },
+        "updated_at": { "type": "date" },
+        "status": { "type": "keyword" }
+      }
+    }
+  },
+  
+  "rooms_index": {
+    "mappings": {
+      "properties": {
+        "id": { "type": "keyword" },
+        "room_name": { 
+          "type": "text",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
+        "room_slug": { "type": "keyword" },
+        "room_type": { 
+          "type": "text",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
+        
+        "hotel_id": { "type": "keyword" },
+        "hotel_name": { 
+          "type": "text",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
+        "hotel_slug": { "type": "keyword" },
+        "hotel_image_url": { "type": "keyword", "index": false },
+        "location_slug": { "type": "keyword" },
+        "city": { 
+          "type": "text",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
+        "neighborhood": { 
+          "type": "text",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
+        "location": { "type": "geo_point" },
+        
+        "size_sqm_min": { "type": "float" },
+        "size_sqm_max": { "type": "float" },
+        "max_adults": { "type": "integer" },
+        "max_children": { "type": "integer" },
+        "max_infants": { "type": "integer" },
+        "total_max_occupancy": { "type": "integer" },
+        "bathroom_type": { "type": "keyword" },
+        
+        "tier": { "type": "keyword" },
+        
+        "amenities": { "type": "keyword" },
+        "unique_features": { "type": "text" },
+        "climate_control": { "type": "keyword" },
+        "has_coffee_machine": { "type": "boolean" },
+        "has_mini_fridge": { "type": "boolean" },
+        "has_workspace": { "type": "boolean" },
+        
+        "tags": { "type": "keyword" },
+        "ideal_for": { "type": "keyword" },
+        "not_ideal_for": { "type": "keyword" },
+        
+        "description": { "type": "text" }
+      }
+    }
+  }
+}

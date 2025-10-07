@@ -131,36 +131,41 @@ export default defineNitroPlugin(async () => {
 
         // Index all rooms in rooms collection
         if (rooms.length > 0) {
-          // First, delete existing rooms for this hotel to handle room deletions
-          try {
-            await client.collections('rooms').documents().delete({
-              filter_by: `hotel_id:=${hotel.id}`
-            })
-          } catch (error) {
-            // Ignore errors if no rooms exist
-            logger.debug('No existing rooms to delete or delete failed', {
-              service: 'typesense-sync',
-              hotelId: hotel.id
-            })
-          }
+          let successfulUpserts = 0
+          let failedUpserts = 0
+          
+          // First upsert all rooms, tracking successes and failures
+          const upsertResults = await Promise.allSettled(
+            rooms.map(room => 
+              client.collections('rooms').documents().upsert(room)
+            )
+          )
 
-          // Then upsert all current rooms
-          for (const room of rooms) {
-            try {
-              await client.collections('rooms').documents().upsert(room)
-            } catch (error) {
-              logger.error('Failed to index room in Typesense', error as Error, {
+          // Count successes and failures
+          upsertResults.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+              successfulUpserts++
+            } else {
+              failedUpserts++
+              logger.error('Failed to upsert room in Typesense', result.reason as Error, {
                 service: 'typesense-sync',
                 hotelId: hotel.id,
-                roomId: room.id
+                roomId: rooms[index].id,
+                roomName: rooms[index].room_name
               })
             }
-          }
+          })
+
+          // NOTE: We don't delete old rooms anymore since room IDs are now unique (hotelId-roomId)
+          // The upsert operation will replace existing documents with the same ID
+          // If room structure changes, we'd need a manual cleanup or collection recreation
 
           logger.info('✅ Room documents indexed in Typesense', {
             service: 'typesense-sync',
             hotelId: hotelDoc._id,
-            roomCount: rooms.length,
+            successful: successfulUpserts,
+            failed: failedUpserts,
+            total: rooms.length,
             operationType
           })
         }

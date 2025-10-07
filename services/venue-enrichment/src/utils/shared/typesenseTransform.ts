@@ -95,6 +95,7 @@ function transformHotelDocument(
       brand_affiliation: identity.brandAffiliation,
       
       // Location
+      location_slug: hotel.locationSlug,
       country: location.country,
       region: location.region,
       city: location.city,
@@ -121,9 +122,9 @@ function transformHotelDocument(
       has_michelin_restaurant: hasMichelin,
       breakfast_included: foodAndBeverage.breakfast?.includedInRate === true,
       
-      // Reviews
-      review_score: reviews.aggregate?.score,
-      review_count: reviews.aggregate?.count,
+      // Reviews (provide defaults for required sorting fields)
+      review_score: reviews.aggregate?.score ?? 0,
+      review_count: reviews.aggregate?.count ?? 0,
       location_score: reviews.scoresByCategory?.location,
       cleanliness_score: reviews.scoresByCategory?.cleanliness,
       service_score: reviews.scoresByCategory?.service,
@@ -216,7 +217,7 @@ function transformRoomDocument(
     }
 
     const roomDoc: TypesenseRoomDocument = {
-      id: room.roomId || room.id || `${hotelId}-${identity?.name}`,
+      id: `${hotelId}-${room.roomId || room.id || identity?.name || 'unknown'}`,
       room_name: room.roomName || identity?.name || 'Unknown Room',
       room_slug: room.roomSlug || `${hotel.slug}-${room.roomId || room.id}`,
       room_type: identity?.roomType || '',
@@ -227,6 +228,8 @@ function transformRoomDocument(
       // Denormalized hotel context
       hotel_name: hotel.name || 'Unknown Hotel',
       hotel_slug: hotel.slug || hotelId,
+      location_slug: hotel.locationSlug,
+      hotel_image_url: hotel.media?.primaryImage?.url,
       city: hotel.location?.city,
       location: hotel.location?.coordinates?.lat && hotel.location?.coordinates?.lon
         ? [hotel.location.coordinates.lat, hotel.location.coordinates.lon]
@@ -265,7 +268,7 @@ function transformRoomDocument(
       not_ideal_for: wouldMatch?.notIdealFor,
       
       // Content
-      description: identity?.description,
+      description: identity?.descriptionShort || identity?.description,
     }
 
     return roomDoc
