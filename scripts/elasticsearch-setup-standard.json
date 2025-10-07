@@ -1,6 +1,26 @@
 {
   "_comment": "Elasticsearch indices with standard analyzer + fuzziness (no ngrams needed for full-word search)",
   "hotels_index": {
+    "settings": {
+      "analysis": {
+        "filter": {
+          "amenity_synonyms": {
+            "type": "synonym",
+            "synonyms": [
+              "wifi, wi-fi, wi fi => wifi",
+              "ac, air conditioning, aircon => air conditioning"
+            ]
+          }
+        },
+        "analyzer": {
+          "amenity_analyzer": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": ["lowercase", "amenity_synonyms"]
+          }
+        }
+      }
+    },
     "mappings": {
       "properties": {
         "id": { "type": "keyword" },
@@ -39,7 +59,13 @@
         "description": { "type": "text" },
         "unique_selling_points": { "type": "text" },
         
-        "amenities": { "type": "keyword" },
+        "amenities": { 
+          "type": "text",
+          "analyzer": "amenity_analyzer",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
         "has_spa": { "type": "boolean" },
         "has_parking": { "type": "boolean" },
         "has_airport_shuttle": { "type": "boolean" },
@@ -79,6 +105,26 @@
   },
   
   "rooms_index": {
+    "settings": {
+      "analysis": {
+        "filter": {
+          "amenity_synonyms": {
+            "type": "synonym",
+            "synonyms": [
+              "wifi, wi-fi, wi fi => wifi",
+              "ac, air conditioning, aircon => air conditioning"
+            ]
+          }
+        },
+        "analyzer": {
+          "amenity_analyzer": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": ["lowercase", "amenity_synonyms"]
+          }
+        }
+      }
+    },
     "mappings": {
       "properties": {
         "id": { "type": "keyword" },
@@ -130,16 +176,37 @@
         
         "tier": { "type": "keyword" },
         
-        "amenities": { "type": "keyword" },
+        "amenities": { 
+          "type": "text",
+          "analyzer": "amenity_analyzer",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
         "unique_features": { "type": "text" },
         "climate_control": { "type": "keyword" },
         "has_coffee_machine": { "type": "boolean" },
         "has_mini_fridge": { "type": "boolean" },
         "has_workspace": { "type": "boolean" },
         
-        "tags": { "type": "keyword" },
-        "ideal_for": { "type": "keyword" },
-        "not_ideal_for": { "type": "keyword" },
+        "tags": { 
+          "type": "text",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
+        "ideal_for": { 
+          "type": "text",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
+        "not_ideal_for": { 
+          "type": "text",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
         
         "description": { "type": "text" }
       }

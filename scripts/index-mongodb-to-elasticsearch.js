@@ -42,77 +42,29 @@ function transformHotelForES(hotel) {
   const coordinates = location.coordinates || { lat: 0, lon: 0 }
   const facilities = hotel.facilities || {}
   const reviews = hotel.reviews || {}
+  const identity = hotel.identity || {}
   
   return {
     id: String(hotel._id),
-    name: hotel.name || 'Unknown Hotel',
-    slug: hotel.slug || String(hotel._id),
-    selves_id: hotel.selvesId || null,
-    
-    // Ratings & Reviews
-    star_rating: hotel.starRating || 0,
-    price_tier: hotel.priceTier || null,
-    hotel_types: hotel.hotelTypes || [],
-    brand_affiliation: hotel.brandAffiliation || null,
-    
-    // Location
-    location_slug: location.slug || null,
-    country: location.country || '',
-    region: location.region || '',
+    name: hotel.name || identity.name || 'Unknown Hotel',
+    hotel_slug: hotel.slug || String(hotel._id),
+    hotel_image_url: hotel.media?.primaryImage?.url || null,
+    location_slug: hotel.location?.locationSlug || null,
+    description: hotel.identity?.descriptionShort || '',
     city: location.city || '',
     neighborhood: location.neighborhood || '',
-    location: coordinates.lat && coordinates.lon ? {
-      lat: coordinates.lat,
-      lon: coordinates.lon
-    } : null,
-    walkability_score: location.walkabilityScore || 0,
-    
-    // Description
-    description: hotel.description || '',
-    unique_selling_points: hotel.uniqueSellingPoints || '',
-    
-    // Amenities
+    country: location.country || '',
+    region: location.region || '',
+    location: {
+      lat: coordinates.lat || 0,
+      lon: coordinates.lon || 0
+    },
+    star_rating: identity.starRating || 0,
+    brand_affiliation: identity.brandAffiliation || '',
+    total_rooms: (hotel.rooms || []).length,
     amenities: facilities.hotelAmenities || [],
-    has_spa: (facilities.hotelAmenities || []).some(a => a.toLowerCase().includes('spa')),
-    has_parking: (facilities.hotelAmenities || []).some(a => a.toLowerCase().includes('parking')),
-    has_airport_shuttle: (facilities.hotelAmenities || []).some(a => a.toLowerCase().includes('airport') || a.toLowerCase().includes('shuttle')),
-    pet_friendly: (facilities.hotelAmenities || []).some(a => a.toLowerCase().includes('pet')),
-    
-    // Dining
-    restaurant_count: facilities.restaurants?.length || 0,
-    restaurant_cuisines: facilities.restaurants?.map(r => r.cuisine).filter(Boolean) || [],
-    has_michelin_restaurant: (facilities.restaurants || []).some(r => r.michelinStars > 0),
-    breakfast_included: facilities.breakfastIncluded || false,
-    
-    // Reviews
-    review_score: reviews.overallScore || 0,
-    review_count: reviews.totalReviews || 0,
-    location_score: reviews.locationScore || 0,
-    cleanliness_score: reviews.cleanlinessScore || 0,
-    service_score: reviews.serviceScore || 0,
-    
-    // Sustainability
-    sustainability_certifications: hotel.sustainabilityCertifications || [],
-    
-    // Room stats (calculated from rooms)
-    room_type_count: 0, // Will be filled in
-    room_types_available: [], // Will be filled in
-    min_room_size_sqm: 0,
-    max_room_size_sqm: 0,
-    min_room_price: 0,
-    max_room_price: 0,
-    max_occupancy_available: 0,
-    currency: 'USD',
-    
-    // POI
-    nearby_poi_names: (hotel.nearbyPOIs || []).map(poi => poi.name).filter(Boolean),
-    nearby_poi_categories: (hotel.nearbyPOIs || []).map(poi => poi.category).filter(Boolean),
-    
-    // Metadata
-    created_at: hotel.createdAt || new Date().toISOString(),
-    content_last_updated: hotel.contentLastUpdated || hotel.updatedAt || new Date().toISOString(),
-    updated_at: hotel.updatedAt || new Date().toISOString(),
-    status: hotel._status || 'published'
+    tags: [],
+    ideal_for: []
   }
 }
 
@@ -144,8 +96,8 @@ function transformRoomForES(room, hotel, hotelES) {
     hotel_id: String(hotel._id),
     hotel_name: hotel.name || 'Unknown Hotel',
     hotel_slug: hotel.slug || String(hotel._id),
-    hotel_image_url: hotel.primaryImage || null,
-    location_slug: hotel.location?.slug || null,
+    hotel_image_url: hotel.media?.primaryImage?.url || null,
+    location_slug: hotel.location?.locationSlug || null,
     city: hotel.location?.city || '',
     neighborhood: hotel.location?.neighborhood || '',
     location: hotelES.location,
